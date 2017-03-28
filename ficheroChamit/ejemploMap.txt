@@ -1,0 +1,40 @@
+Having a map into a struct, I was expecting that using `new(struct)` I 
+would get a full struct initialized (to zero) included the map but it 
+has to be manually initialized. 
+
+=== 
+package main 
+
+import ( 
+        "fmt" 
+) 
+
+type version struct { 
+        A        int 
+        B        int 
+} 
+
+type T struct { 
+        Name      string 
+        Versions  map[byte]version 
+} 
+
+
+func main() { 
+        v := version{12, 33} 
+
+        // map manually initialized 
+        var t T 
+        t.Name = "welcome to Miami" 
+        t.Versions = make(map[byte]version) 
+        t.Versions[1] = v 
+
+        // faills because the map is uninitialized 
+        t2 := new(T) 
+        t2.Versions[2] = v 
+
+        fmt.Printf("%T : %v\n", t2,t2) 
+} 
+=== 
+
+enlace https://groups.google.com/forum/#!topic/golang-nuts/cSPpHPGf_a8
