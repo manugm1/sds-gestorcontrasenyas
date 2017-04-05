@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"net/http/cookiejar"
 )
 
 // respuesta del servidor
@@ -20,16 +19,25 @@ type Resp struct {
 	Msg string // mensaje adicional
 }
 
+// respuesta del servidor con peticiones sobre entradas
+type RespEntrada struct {
+	Ok  bool   // true -> correcto, false -> error
+	Msg string // mensaje adicional
+	Entradas map[int]Entrada
+}
+
 type Usuario struct{
 	Email string
 	Password string
 }
 
-var SesionIniciada = false //para probar el inicio de sesión y que salga el menú principal.
-														//De momento solo se pone a true cuando hacemos login
-														//Al cerrar sesión se pone a false de nuevo
-														//Esto habría que implementarlo con sesiones reales
-var cookie []*http.Cookie
+type Entrada struct {
+    Login string
+    Password string
+    Web string
+    Descripcion string
+}
+
 var usuarioActual Usuario
 
 /**
@@ -132,17 +140,69 @@ func logout(){
 		//Des-serializamos el json a la estructura creada
 		error := json.Unmarshal(cadenaJSON, &respuesta)
 		checkError(error)
-		fmt.Println("resultado del logout: "+string(cadenaJSON))
-		//dar de baja el usuarioactual y la cookie
+		fmt.Println(respuesta.Msg)
 	}
 }
 
 func listarEntradas(){
+	//Si no hay usuario actual, no se hace nada
+	if usuarioActual != (Usuario{}) {
+		parametros := url.Values{}
+		parametros.Set("opcion", "5")
 
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
+		var respuesta RespEntrada
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+		//Recorrer y mostrarfmt.Println(respuesta.Msg)
+
+		for i, m := range respuesta.Entradas {
+       fmt.Println(i, " - ", m)
+	  }
+	}
 }
 
-func anyadirEntrada(){
+func crearEntrada(){
+	//Si no hay usuario actual, no se hace nada
+	if usuarioActual != (Usuario{}) {
+		//Introducir datos de una entrada
+		fmt.Println("Introduce login del servicio: ")
+		login := leerStringConsola()
 
+		fmt.Println("Introduce contraseña del servicio: ")
+		password := leerStringConsola()
+
+		fmt.Println("Introduce la web del servicio: ")
+		web := leerStringConsola()
+
+		fmt.Println("Introduce una descripción: ")
+		descripcion := leerStringConsola()
+
+		parametros := url.Values{}
+		parametros.Set("opcion", "7")
+
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//Pasamos el parámetro a la estructura Entrada
+		entrada := Entrada{Login: login, Password: password, Web: web, Descripcion: descripcion}
+		parametros.Set("entrada", codificarStructToJSONBase64(entrada))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+
+		var respuesta Resp
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+		fmt.Println(respuesta.Msg)
+	}
 }
 
 func editarEntrada(){
@@ -212,8 +272,8 @@ func menuPrincipal(){
 			listarEntradas()
 			break
 		case "2":
-			fmt.Println("Se ha elegido añadir entrada")
-			anyadirEntrada()
+			fmt.Println("Se ha elegido crear entrada")
+			crearEntrada()
 			break
 		case "3":
 			fmt.Println("Se ha elegido editar entrada")
@@ -239,7 +299,7 @@ func leerStringConsola()(string){
 	reader := bufio.NewReader(os.Stdin)
 	lectura, error := reader.ReadString('\n')
 	checkError(error)
-	return strings.TrimSpace(strings.Replace(lectura, " ", "", -1)) // quitamos los espacios
+	return strings.TrimSpace(lectura) // quitamos los espacios
 }
 
 /**
@@ -248,17 +308,11 @@ func leerStringConsola()(string){
 * método invocador el que parsee como desee la respuesta
 */
 func comunicarServidor(parametros url.Values)([]byte){
-	jar, _ := cookiejar.New(nil)
-	u, _ := url.Parse("https://localhost:10443")
-	jar.SetCookies(u, cookie)
-	fmt.Println("ANTES RESPUESTA------")
-	for k, v := range cookie {
-				fmt.Println("key:", k, "value:", v)
-	}
+
 	transporte := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	cliente := &http.Client{Transport: transporte, Jar: jar}
+	cliente := &http.Client{Transport: transporte}
 	//Pasamos los parámetros codificados a base 64 para enviarlos de forma
 	//segura (sin caracteres problemáticos añadidos)
 	peticion, error := cliente.PostForm("https://localhost:10443", parametros)
@@ -271,12 +325,6 @@ func comunicarServidor(parametros url.Values)([]byte){
 	//Paso más, pasamos a JSON simple, decodificamos JSON base 64
 	respuesta = decodificarJSONBase64ToJSON(string(respuesta))
 
-	fmt.Println("DESPUES RESPUESTA------")
-	//Debug, mostramos las cabeceras header que devuelve el servidor
-	for k, v := range peticion.Cookies() {
-				fmt.Println("key:", k, "value:", v)
-	}
-	cookie = peticion.Cookies()
 	return respuesta
 }
 
@@ -301,7 +349,6 @@ func decodificarJSONBase64ToJSON(cadenaCodificada string)([]byte){
 	//Decodificamos el base64
 	cadena, error := base64.StdEncoding.DecodeString(cadenaCodificada)
 	checkError(error)
-
 	//Pasamos a []byte de JSON
 	respuesta := []byte(cadena)
 	return respuesta

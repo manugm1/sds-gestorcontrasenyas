@@ -1,27 +1,29 @@
 package main
 
 import (
-	senyal "context" //tenemos dos context, el por defecto y el de sesiones, renombramos éste
+	"context" //tenemos dos context, el por defecto y el de sesiones, renombramos éste
 	"encoding/json"
 	"encoding/base64"
 	"fmt"
-	"strconv"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 	"io/ioutil"
-	"github.com/gorilla/context"
-	"github.com/gorilla/sessions"
-	"github.com/gorilla/securecookie"
 )
 
-// respuesta del servidor
+// respuesta por defecto del servidor
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
-	SessionId string
+}
+
+// respuesta del servidor con peticiones sobre entradas
+type RespEntrada struct {
+	Ok  bool   // true -> correcto, false -> error
+	Msg string // mensaje adicional
+	Entradas map[int]Entrada
 }
 
 type Usuario struct{
@@ -37,12 +39,17 @@ type Entrada struct {
     Descripcion string
 }
 
+type Sesion struct {
+		Email string
+		TiempoLimite time.Time
+}
+
 //Declaramos y/o inicializamos variables globales
 var rutaBBDD = "bbdd.json"
 var bbdd *os.File
 var usuarios = make(map[string]Usuario)
 var entradas = make(map[int]Entrada)
-var sesiones *sessions.CookieStore
+var sesiones = make(map[string]Sesion)
 
 // función para escribir una respuesta del servidor al cliente
 func comunicarCliente(w http.ResponseWriter, estructura interface{}) {
@@ -58,16 +65,8 @@ func main() {
 	mux.Handle("/", http.HandlerFunc(handler))
 	//El clearHandler es por las sesiones, para no provocar:
 	//"you need to wrap your handlers with context.ClearHandler as or else you will leak memory!"
-	srv := &http.Server{Addr: ":10443", Handler: context.ClearHandler(mux)}
+	srv := &http.Server{Addr: ":10443", Handler: mux}
 
-	//Las opciones de las sesiones
-	sesiones = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
-	sesiones.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   10, // 8 hours
-		HttpOnly: true,
-		Secure: true,
-	}
 
 	go func() {
 		if err := srv.ListenAndServeTLS("cert.pem", "key.pem"); err != nil {
@@ -99,7 +98,7 @@ func main() {
 	log.Println("Apagando servidor ...")
 
 	//Apagar servidor de forma segura
-	ctx, fnc := senyal.WithTimeout(senyal.Background(), 5*time.Second)
+	ctx, fnc := context.WithTimeout(context.Background(), 5*time.Second)
 	fnc()
 	srv.Shutdown(ctx)
 	log.Println("Servidor detenido correctamente")
@@ -114,10 +113,9 @@ func handler(w http.ResponseWriter, request *http.Request) {
 	//Obtenemos la opción/operación solicitada por el cliente
 	opcion := request.Form.Get("opcion")
 
-	if sesion := obtenerSesionPorId(w, request); sesion != nil {
-		//Devolvemos tan solo la cookie del usuario X
-		sesion.Save(request, w)
-	} else if opcion != "1" && opcion != "2" && opcion != "3" {
+	//Si se intenta desde el cliente insertar una opción que necesita estar logueado y NO está logueado
+	// en el servidor, el servidor no le dejará y devolverá error "Operación no permitida..."
+	if !tienePermisosOpciones(w, request, opcion){
 		opcion = "0"
 	}
 
@@ -125,25 +123,31 @@ func handler(w http.ResponseWriter, request *http.Request) {
 		case "0": //caso básico para no permitir
 			resp := Resp{Ok: false, Msg: "Operación no permitida. No ha iniciado sesión."} // formateamos respuesta
 			comunicarCliente(w, resp)
+			break
 		case "1": // registro
 			registro(w, request)
 			break
 		case "2": // login
 			login(w, request)
+			break
 		case "3": //Es logueado
 			esLogueado(w, request)
+			break
 		case "4": //Logout
 			logout(w, request)
-		case "5": //Listar todas las entradas
-
-		case "6": //Listar una entrada por id
-
+			break
+		case "5": //Listar todas las entradas del usuario X
+			listarEntradas(w, request)
+			break
+		case "6": //Listar una entrada por id de entrada
+			break
 		case "7": //Crear entrada
-
+			crearEntrada(w, request)
+			break
 		case "8": //Editar entrada
-
+			break
 		case "9": //Borrar entrada
-
+			break
 		default:
 			resp := Resp{Ok: false, Msg: "Comando inválido"}    // formateamos respuesta
 			comunicarCliente(w, resp)
@@ -156,6 +160,39 @@ func handler(w http.ResponseWriter, request *http.Request) {
 */
 func existeUsuario(email string) (ok bool) {
 	if _, ok = usuarios[email]; ok {
+	}
+	return
+}
+
+/**
+* Función que comprueba si existe el usuario está logueado
+* Recibe como parámetro el email (clave primaria) del usuario
+* A diferencia de "esLogueado" esta función es interna del servidor
+* por lo que no necesita recibir parámetros de request y response
+*/
+func esEmailLogueado(email string) (ok bool){
+	ok = false
+	fechaHoraActual := time.Now()
+	if email == sesiones[email].Email &&
+			 fechaHoraActual.Before(sesiones[email].TiempoLimite) {
+			 ok = true
+	}
+	return
+}
+
+/**
+* Comprueba si el usuario tiene permisos para utilizar las opciones propias de un usuario logueado
+*/
+func tienePermisosOpciones(w http.ResponseWriter, request *http.Request, opcion string) (ok bool) {
+	ok = true
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSON := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+	var usuario Usuario
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSON, &usuario)
+	checkError(error)
+	if !esEmailLogueado(usuario.Email) && opcion != "1" && opcion != "2" && opcion != "3"{
+		ok = false
 	}
 	return
 }
@@ -200,13 +237,12 @@ func login(w http.ResponseWriter, request *http.Request){
 		//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
 		if usuarios[usuario.Email].Email == usuario.Email &&
 			usuarios[usuario.Email].Password == usuario.Password{
-			//Se crea la sesión
-	    sesion, error2 := sesiones.Get(request, "sesionid")
-	    checkError(error2)
-	    sesion.Values["email"] = usuario.Email
-	    // Guardamos la sesion, antes de que se responda al cliente llamando a "comunicarCliente"
-			sesion.Save(request, w)
-			r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente."}    // formateamos respuesta
+				//Se crea la sesión con tiempo actual + 10 segundos de tiempo límite
+				sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
+                                 time.Minute * time.Duration(1) +
+                                 time.Second * time.Duration(30))}
+				sesiones[usuario.Email] = sesion
+				r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente."}    // formateamos respuesta
 	  }else{
 			r = Resp{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo."}    // formateamos respuesta
 		}
@@ -227,55 +263,78 @@ func esLogueado(w http.ResponseWriter, request *http.Request) {
 	error := json.Unmarshal(cadenaJSON, &usuario)
 	checkError(error)
 	r := Resp{}
-	sesion, err := sesiones.Get(request, "sesionid")
-	//La sesión (cookie) tiene como valor el email del usuario
-	fmt.Println("EL MAXIMO EDAD ES: "+strconv.Itoa(sesion.Options.MaxAge))
-	if err == nil && !sesion.IsNew && sesion.Options.MaxAge>0 && (sesion.Values["email"] == usuario.Email) {
-		fmt.Println("Logueadoooo")
-		r = Resp{Ok: true, Msg: "El usuario está logueado correctamente."}    // formateamos respuesta
+
+	//Comprobamos tanto si el usuario existe en el map de sesiones como si su datetime
+	//no ha pasado
+	if esEmailLogueado(usuario.Email) {
+		 r = Resp{Ok: true, Msg: "El usuario está logueado correctamente."} // formateamos respuesta
 	} else{
-		fmt.Println("No logueadooo")
-		r = Resp{Ok: false, Msg: "El usuario no está logueado."}    // formateamos respuesta
+		 r = Resp{Ok: false, Msg: "El usuario no está logueado."} // formateamos respuesta
 	}
 	comunicarCliente(w, r)
 }
 
 func logout(w http.ResponseWriter, request *http.Request){
-	r := Resp{}
-	if sesion := obtenerSesionPorId(w, request); sesion != nil {
-		//Establecemos el valor a vacío y el tiempo de expiración a nulo para borrarlo
-		sesion.Values["email"] = ""
-		sesion.Options.MaxAge = -10
-		sesion.Save(request, w)
-		w.Header().Set("Expires", "Tue, 03 Jul 2001 06:00 GMT")
-		w.Header().Set("Last-Modified", "{now} GMT")
-		w.Header().Set("Cache-Control", "max-age=0, no-cache, must-revalidate, proxy-revalidate")
-
-		r = Resp{Ok: true, Msg: "Sesión cerrada con éxito."}    // formateamos respuesta
-	} else{
-		r = Resp{Ok: false, Msg: "No se ha podido cerrar sesión. Ha ocurrido algún error inesperado."}    // formateamos respuesta
-	}
-	comunicarCliente(w, r)
-}
-/**
-* Comprueba si el usuario está logueado y devuelve la sesión.
-* A diferencia de "esLogueado", este método es interno a nivel del server y no se comunicar
-* con el cliente
-*/
-func obtenerSesionPorId(w http.ResponseWriter, request *http.Request)(*sessions.Session){
-	var respuesta *sessions.Session
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSON := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
 	var usuario Usuario
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &usuario)
 	checkError(error)
-	sesion, err := sesiones.Get(request, "sesionid")
-	//La sesión (cookie) tiene como valor el email del usuario
-	if err == nil && !sesion.IsNew && sesion.Options.MaxAge>0 && (sesion.Values["email"] == usuario.Email) {
-		respuesta = sesion
+	r := Resp{}
+	if esEmailLogueado(usuario.Email) {
+		//Cerrar sesión
+		//Borramos del mapa de sesiones
+		delete(sesiones, usuario.Email)
+		r = Resp{Ok: true, Msg: "Sesión cerrada con éxito."}    // formateamos respuesta
+	} else{
+		r = Resp{Ok: false, Msg: "La sesión ya está cerrada."}
 	}
-	return respuesta
+	comunicarCliente(w, r)
+}
+
+func crearEntrada(w http.ResponseWriter, request *http.Request){
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+	cadenaJSONEntrada := decodificarJSONBase64ToJSON(request.Form.Get("entrada"))
+
+	var usuario Usuario
+	var entrada Entrada
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
+	checkError(error)
+	error2 := json.Unmarshal(cadenaJSONEntrada, &entrada)
+	checkError(error2)
+	r := Resp{}
+	//Si está logueado el usuario en el sistema, entonces podemos crear la entrada
+	//Si no, error ya que se le ha acabado la sesión
+	if esEmailLogueado(usuario.Email) {
+		//Las entradas empezarán en el 1
+		usuarios[usuario.Email].Entradas[len(usuarios[usuario.Email].Entradas)+1] = entrada
+		r = Resp{Ok: true, Msg: "Entrada creada con éxito."}
+	} else {
+		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+	}
+	comunicarCliente(w, r)
+}
+
+func listarEntradas(w http.ResponseWriter, request *http.Request){
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+
+	var usuario Usuario
+
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
+	checkError(error)
+
+	r:= RespEntrada{}
+	if esEmailLogueado(usuario.Email) {
+		r = RespEntrada{Ok: true, Msg: "Devolviendo entradas.", Entradas: usuarios[usuario.Email].Entradas}
+	} else {
+		r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
+	}
+	comunicarCliente(w, r)
 }
 
 /**
