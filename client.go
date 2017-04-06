@@ -291,9 +291,6 @@ func editarEntrada(){
         fmt.Println("No existe Entrada con id ",i)
 
 			}
-
-
-
 	}
 
 }
@@ -344,6 +341,38 @@ func borrarEntrada(){
 }
 }
 
+func obtenerEntradasPorId(){
+	//Si no hay usuario actual, no se hace nada
+	if usuarioActual != (Usuario{}) {
+		parametros := url.Values{}
+		parametros.Set("opcion", "5")
+
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
+		var respuesta RespEntrada
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+
+		fmt.Println("Introduce id de la entrada: ")
+		id := leerStringConsola()
+    i, error := strconv.Atoi(id)
+    checkError(error)
+		aux, ok := respuesta.Entradas[i]
+			if ok {
+				fmt.Println(aux)
+
+			}else{
+        fmt.Println("No existe Entrada con id ",i)
+
+			}
+	}
+}
+
 func main() {
 	fmt.Println("-------GESTOR DE CONTRASEÑAS-------")
 	menu()
@@ -391,9 +420,10 @@ func menuPrincipal(){
 		fmt.Println("-------¡Bienvenido!-------")
 		fmt.Println("-------Elige opción [1-4] o 'q' para cerrar sesión-------")
 		fmt.Println("[1] Listar entradas")
-		fmt.Println("[2] Añadir entrada")
-		fmt.Println("[3] Editar entrada")
-		fmt.Println("[4] Borrar entrada")
+		fmt.Println("[2] Obtener entrada")
+		fmt.Println("[3] Añadir entrada")
+		fmt.Println("[4] Editar entrada")
+		fmt.Println("[5] Borrar entrada")
 		fmt.Println("[q] Cerrar sesión")
 		opcionElegida := leerStringConsola()
 
@@ -403,14 +433,19 @@ func menuPrincipal(){
 			listarEntradas()
 			break
 		case "2":
+				fmt.Println("Se ha elegido Obtener entrada")
+				obtenerEntradasPorId()
+				break
+
+		case "3":
 			fmt.Println("Se ha elegido crear entrada")
 			crearEntrada()
 			break
-		case "3":
+		case "4":
 			fmt.Println("Se ha elegido editar entrada")
 			editarEntrada()
 			break
-		case "4":
+		case "5":
 			fmt.Println("Se ha elegido borrar entrada")
 			borrarEntrada()
 			break

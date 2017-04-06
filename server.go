@@ -141,6 +141,7 @@ func handler(w http.ResponseWriter, request *http.Request) {
 			listarEntradas(w, request)
 			break
 		case "6": //Listar una entrada por id de entrada
+		  obtenerEntradasPorId(w, request)
 			break
 		case "7": //Crear entrada
 			crearEntrada(w, request)
@@ -403,6 +404,25 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 
 }
 
+func obtenerEntradasPorId(w http.ResponseWriter, request *http.Request){
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+	var usuario Usuario
+
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
+	checkError(error)
+
+	r:= RespEntrada{}
+	if esEmailLogueado(usuario.Email) {
+		   r = RespEntrada{Ok: true, Msg: "Devolviendo entrada.",Entradas: usuarios[usuario.Email].Entradas}
+	} else {
+		   r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
+	}
+	comunicarCliente(w, r)
+
+
+}
 /**
 * Codificamos en JSON una estructura cualquiera y
 * devolvemos codificado el JSON en base64
