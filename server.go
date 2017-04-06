@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"time"
 	"io/ioutil"
+	"strconv"
 )
 
 // respuesta por defecto del servidor
@@ -145,8 +146,10 @@ func handler(w http.ResponseWriter, request *http.Request) {
 			crearEntrada(w, request)
 			break
 		case "8": //Editar entrada
+		  modificarEntrada(w, request)
 			break
 		case "9": //Borrar entrada
+		  borrarEntrada(w, request)
 			break
 		default:
 			resp := Resp{Ok: false, Msg: "Comando inválido"}    // formateamos respuesta
@@ -233,6 +236,7 @@ func login(w http.ResponseWriter, request *http.Request){
 	r := Resp{}
 	//Comprobamos que el usuario existe en la base de datos
 	if existeUsuario(usuario.Email){
+		fmt.Println("existe usuario")
 		//Ahora comprobamos si Email y Contraseña enviada
 		//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
 		if usuarios[usuario.Email].Email == usuario.Email &&
@@ -290,6 +294,7 @@ func logout(w http.ResponseWriter, request *http.Request){
 	} else{
 		r = Resp{Ok: false, Msg: "La sesión ya está cerrada."}
 	}
+
 	comunicarCliente(w, r)
 }
 
@@ -315,6 +320,7 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 	}
+	anyadirEntrada()
 	comunicarCliente(w, r)
 }
 
@@ -335,6 +341,66 @@ func listarEntradas(w http.ResponseWriter, request *http.Request){
 		r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
 	}
 	comunicarCliente(w, r)
+}
+
+/*
+* Funcion para modificar una entrada
+*/
+func modificarEntrada(w http.ResponseWriter, request *http.Request){
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+	cadenaJSONEntrada := decodificarJSONBase64ToJSON(request.Form.Get("entrada"))
+	opcion := request.Form.Get("id")
+
+	var usuario Usuario
+	var entrada Entrada
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
+	checkError(error)
+	error2 := json.Unmarshal(cadenaJSONEntrada, &entrada)
+	checkError(error2)
+	r := Resp{}
+	//Si está logueado el usuario en el sistema, entonces podemos crear la entrada
+	//Si no, error ya que se le ha acabado la sesión
+	if esEmailLogueado(usuario.Email) {
+		i, error := strconv.Atoi(opcion)
+		checkError(error)
+		//se pasa el id de la entrada al que se pretende modificar
+		usuarios[usuario.Email].Entradas[i]= entrada
+		r = Resp{Ok: true, Msg: "Entrada Modificada con éxito."}
+	} else {
+		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+	}
+	anyadirEntrada()
+	comunicarCliente(w, r)
+}
+
+/*
+*Funcion para borrar una entrada de un usuario
+*/
+func borrarEntrada(w http.ResponseWriter, request *http.Request){
+	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+	opcion := request.Form.Get("id")
+
+	var usuario Usuario
+	//Des-serializamos el json a la estructura creada
+	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
+	checkError(error)
+
+	r := Resp{}
+	if esEmailLogueado(usuario.Email) {
+		i, error := strconv.Atoi(opcion)
+		checkError(error)
+		//se pasa el id de la entrada al que se pretende borrar
+		delete(usuarios[usuario.Email].Entradas, i)
+		r = Resp{Ok: true, Msg: "Entrada Borrada con éxito."}
+	} else {
+		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+	}
+	anyadirEntrada()
+	comunicarCliente(w, r)
+
 }
 
 /**
@@ -373,7 +439,17 @@ func cargarDatos(){
 	checkError(error)
 	json.Unmarshal(datosBBDD, &usuarios)
 }
+/**
+*Funcion que se encarga de añadir entradas en el fichero
+*/
+func anyadirEntrada(){
 
+  b, err := json.Marshal(usuarios)
+  checkError(err)
+  er := ioutil.WriteFile(rutaBBDD, []byte(b), 0666)
+  checkError(er)
+
+}
 /**
 * Función que chequea los errores y muestra por pantalla en caso de haber alguno
  */

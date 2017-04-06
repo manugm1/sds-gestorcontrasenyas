@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"strconv"
 )
 
 // respuesta del servidor
@@ -204,13 +205,143 @@ func crearEntrada(){
 		fmt.Println(respuesta.Msg)
 	}
 }
+/*func modificar(usuario,dato string,id int,path string){
 
+  //p:=mapa[usuario].Entradas[id]
+  m:=mapa[usuario].Entradas[id]
+  m.Password=dato
+  mapa[usuario].Entradas[id]=m
+  altaEntrada(path)
+}*/
 func editarEntrada(){
+
+	//Si no hay usuario actual, no se hace nada
+	if usuarioActual != (Usuario{}) {
+		parametros := url.Values{}
+		parametros.Set("opcion", "5")
+
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
+		var respuesta RespEntrada
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+
+		fmt.Println("Introduce id de la entrada: ")
+		id := leerStringConsola()
+    i, error := strconv.Atoi(id)
+    checkError(error)
+		aux, ok := respuesta.Entradas[i]
+			if ok {
+				fmt.Println("Login: ",aux.Login)
+				fmt.Println("Password: ",aux.Password)
+				fmt.Println("Web: ",aux.Web)
+				fmt.Println("Descripcion: ",aux.Descripcion)
+
+				fmt.Println("Elige opcion que quieres modificar: ")
+				fmt.Println("[1] Login")
+				fmt.Println("[2] Password")
+				fmt.Println("[3] Web")
+				fmt.Println("[4] Descripcion")
+				op := leerStringConsola()
+
+				fmt.Println("Inserta dato: ")
+				dato := leerStringConsola()
+				switch op {
+				case "1":
+            aux.Login=dato
+					break
+				case "2":
+            aux.Password=dato
+					break
+				case "3":
+	          aux.Web=dato
+						break
+					case "4":
+	          aux.Descripcion=dato
+						break
+
+				}
+        respuesta.Entradas[i]=aux
+				parametros2 := url.Values{}
+				parametros2.Set("id",id)
+				parametros2.Set("opcion", "8")
+
+				//Pasamos el parámetro a la estructura Usuario
+				parametros2.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+				//Pasamos el parámetro a la estructura Entrada
+
+				parametros2.Set("entrada", codificarStructToJSONBase64(respuesta.Entradas[i]))
+
+				//Pasar parámetros al servidor
+				cadenaJSON := comunicarServidor(parametros2)
+
+				var respuesta Resp
+				//Des-serializamos el json a la estructura creada
+				error := json.Unmarshal(cadenaJSON, &respuesta)
+				checkError(error)
+				fmt.Println(respuesta.Msg)
+
+			}else{
+        fmt.Println("No existe Entrada con id ",i)
+
+			}
+
+
+
+	}
 
 }
 
 func borrarEntrada(){
+	//Si no hay usuario actual, no se hace nada
+	if usuarioActual != (Usuario{}) {
+		parametros := url.Values{}
+		parametros.Set("opcion", "5")
 
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
+		var respuesta RespEntrada
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+
+		fmt.Println("Introduce id de la entrada: ")
+		id := leerStringConsola()
+    i, error := strconv.Atoi(id)
+    checkError(error)
+		aux, ok := respuesta.Entradas[i]
+			if ok {
+        fmt.Println(aux)
+				parametros2 := url.Values{}
+				parametros2.Set("id",id)
+				parametros2.Set("opcion", "9")
+
+				//Pasamos el parámetro a la estructura Usuario
+				parametros2.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+				//Pasar parámetros al servidor
+				cadenaJSON := comunicarServidor(parametros2)
+
+				var respuesta Resp
+				//Des-serializamos el json a la estructura creada
+				error := json.Unmarshal(cadenaJSON, &respuesta)
+				checkError(error)
+				fmt.Println(respuesta.Msg)
+
+			}else{
+        fmt.Println("No existe Entrada con id ",i)
+
+			}
+}
 }
 
 func main() {
@@ -301,6 +432,8 @@ func leerStringConsola()(string){
 	checkError(error)
 	return strings.TrimSpace(lectura) // quitamos los espacios
 }
+
+
 
 /**
 * Método para comunicar con el servidor pasándole una serie de parámetros (url.Values)
