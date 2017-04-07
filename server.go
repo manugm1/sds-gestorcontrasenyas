@@ -321,7 +321,7 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 	}
-	anyadirEntrada()
+	//anyadirEntrada()
 	comunicarCliente(w, r)
 }
 
@@ -372,7 +372,6 @@ func modificarEntrada(w http.ResponseWriter, request *http.Request){
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 	}
-	anyadirEntrada()
 	comunicarCliente(w, r)
 }
 
@@ -399,7 +398,7 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 	}
-	anyadirEntrada()
+
 	comunicarCliente(w, r)
 
 }
@@ -459,17 +458,7 @@ func cargarDatos(){
 	checkError(error)
 	json.Unmarshal(datosBBDD, &usuarios)
 }
-/**
-*Funcion que se encarga de añadir entradas en el fichero
-*/
-func anyadirEntrada(){
 
-  b, err := json.Marshal(usuarios)
-  checkError(err)
-  er := ioutil.WriteFile(rutaBBDD, []byte(b), 0666)
-  checkError(er)
-
-}
 /**
 * Función que chequea los errores y muestra por pantalla en caso de haber alguno
  */
