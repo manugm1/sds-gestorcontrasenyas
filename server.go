@@ -12,6 +12,10 @@ import (
 	"time"
 	"io/ioutil"
 	"strconv"
+	"crypto/rand"
+	"io"
+	"golang.org/x/crypto/scrypt" //para instalar: go get "golang.org/x/crypto/scrypt"
+															//es un subrepositorio, ruta completa
 )
 
 // respuesta por defecto del servidor
@@ -30,6 +34,7 @@ type RespEntrada struct {
 type Usuario struct{
 	Email string
 	Password string
+	Salt string
 	Entradas map[int] Entrada
 }
 
@@ -220,6 +225,19 @@ func registro(w http.ResponseWriter, request *http.Request){
 		//Si no existe, procedemos a crearlo
 		//Inicializamos las entradas como vacías (lógicamente no tiene ninguna)
 		usuario.Entradas = make(map[int]Entrada)
+
+		//Generamos el salt aleatorio para la contraseña
+		salt := make([]byte, 32)
+    _, error2 := io.ReadFull(rand.Reader, salt)
+    checkError(error2)
+		//Recibimos del cliente base64(SHA256(passwordIntroducidaConsola))
+		//Se realiza ahora -> scrypt(decodebase64(SHA256(passwordIntroducidaConsola)), salt)
+		pass, error3 := base64.StdEncoding.DecodeString(usuario.Password)
+		checkError(error3)
+    hash, error4 := scrypt.Key(pass, salt, 16384, 8, 1, 32)
+		checkError(error4)
+		usuario.Password = base64.StdEncoding.EncodeToString(hash)
+		usuario.Salt = base64.StdEncoding.EncodeToString(salt)
 		//Lo agregamos al mapa global de usuarios
 		usuarios[usuario.Email] = usuario
 		r = Resp{Ok: true, Msg: "Registrado con éxito. Inicia sesión para empezar."}    // formateamos respuesta
@@ -237,17 +255,28 @@ func login(w http.ResponseWriter, request *http.Request){
 	r := Resp{}
 	//Comprobamos que el usuario existe en la base de datos
 	if existeUsuario(usuario.Email){
-		fmt.Println("existe usuario")
 		//Ahora comprobamos si Email y Contraseña enviada
 		//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
-		if usuarios[usuario.Email].Email == usuario.Email &&
-			usuarios[usuario.Email].Password == usuario.Password{
-				//Se crea la sesión con tiempo actual + 10 segundos de tiempo límite
+		if usuarios[usuario.Email].Email == usuario.Email {
+			//Generamos el hash con el password pasado como parámetro
+			//y se compara con el que hay insertado en la bbdd (utiliza la salt almacenada en la bbdd)
+			pass, error2 := base64.StdEncoding.DecodeString(usuario.Password)
+			checkError(error2)
+			salt, error3 := base64.StdEncoding.DecodeString(usuarios[usuario.Email].Salt)
+			checkError(error3)
+			hash, error4 := scrypt.Key(pass, salt, 16384, 8, 1, 32)
+			checkError(error4)
+			passIntroducidoCliente := base64.StdEncoding.EncodeToString(hash)
+			if usuarios[usuario.Email].Password == passIntroducidoCliente {
+				//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
 				sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
                                  time.Minute * time.Duration(1) +
                                  time.Second * time.Duration(30))}
 				sesiones[usuario.Email] = sesion
 				r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente."}    // formateamos respuesta
+			}else{
+				r = Resp{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo."}    // formateamos respuesta
+			}
 	  }else{
 			r = Resp{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo."}    // formateamos respuesta
 		}

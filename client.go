@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"encoding/base64"
 	"crypto/tls"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha512"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -27,11 +31,18 @@ type RespEntrada struct {
 	Entradas map[int]Entrada
 }
 
+/**
+* Contraseña usuario: Hasheado 256 bits con clave maestra.
+* Se envía al servidor para calcular la salt y hacer un scrypt
+*/
 type Usuario struct{
 	Email string
 	Password string
 }
 
+/**
+* Contraseña entrada: cifrado con AES/CTR desde el cliente.
+*/
 type Entrada struct {
     Login string
     Password string
@@ -39,7 +50,10 @@ type Entrada struct {
     Descripcion string
 }
 
-var usuarioActual Usuario
+var claveMaestra []byte //clave maestra generada a partir de la contraseña
+												//del usuario, que servirá para cifrar y descifrar las contraseñas
+												//de las cuentas
+var usuarioActual Usuario //usuario actual (logueado)
 
 /**
 * [1] Operación de registro sobre el servidor
@@ -52,11 +66,16 @@ func registro() {
 	fmt.Println("Introduce contraseña: ")
 	password := leerStringConsola()
 
+	//Generamos el hash del password a partir del password para enviarla al servidor
+	//ya con dicho hash
+	claveCliente := sha512.Sum512([]byte(password))
+	passwordHash := base64.StdEncoding.EncodeToString(claveCliente[0:32]) // una mitad para cifrar datos (256 bits)
+
 	//Generamos los parámetros a enviar al servidor
 	parametros := url.Values{}
 	parametros.Set("opcion", "1")
 	//Pasamos el parámetro a la estructura Usuario
-	usuario := Usuario{Email: email, Password: password}
+	usuario := Usuario{Email: email, Password: passwordHash}
 	parametros.Set("usuario", codificarStructToJSONBase64(usuario))
 
 	//Pasar parámetros al servidor
@@ -67,7 +86,7 @@ func registro() {
 	error := json.Unmarshal(cadenaJSON, &respuesta)
 	checkError(error)
 
-	//Mostramos sí o sí lo que nos devuelve como respuesta el servidor
+	//Mostramos lo que nos devuelve como respuesta el servidor
 	fmt.Println(respuesta.Msg)
 }
 
@@ -83,11 +102,16 @@ func login(){
 	fmt.Println("Introduce contraseña: ")
 	password := leerStringConsola()
 
+	//Generamos clave maestra a partir del password que servirá para cifrar/descifrar
+	claveCliente := sha512.Sum512([]byte(password))
+	passwordHash := base64.StdEncoding.EncodeToString(claveCliente[0:32]) // una mitad para cifrar datos (256 bits)
+	claveMaestra = claveCliente[32:64] // una mitad para cifrar datos (256 bits)
+
 	//Generamos los parámetros a enviar al servidor
 	parametros := url.Values{}
 	parametros.Set("opcion", "2")
 	//Pasamos el parámetro a la estructura Usuario
-	usuario := Usuario{Email: email, Password: password}
+	usuario := Usuario{Email: email, Password: passwordHash}
 	parametros.Set("usuario", codificarStructToJSONBase64(usuario))
 
 	//Pasar parámetros al servidor
@@ -156,7 +180,8 @@ func listarEntradas(){
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
-		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
+		//El servidor devuelve un map de entradas y el CLIENTE
+		//lo debe recorrer para mostrarlo por pantalla
 		var respuesta RespEntrada
 		//Des-serializamos el json a la estructura creada
 		error := json.Unmarshal(cadenaJSON, &respuesta)
@@ -164,7 +189,13 @@ func listarEntradas(){
 		//Recorrer y mostrarfmt.Println(respuesta.Msg)
 
 		for i, m := range respuesta.Entradas {
-       fmt.Println(i, " - ", m)
+			fmt.Println(" ----- Entrada ", i, " ----- ")
+			fmt.Println("Login: ", m.Login)
+			fmt.Println("Password (base64 + AES-CTR): ", m.Password, " - Claro: ", descifrarContrasenyaEntrada(m.Password))
+			fmt.Println("Web: ", m.Web)
+			fmt.Println("Descripción: ", m.Descripcion)
+			fmt.Println(" ----- FIN Entrada ", i, " ----- ")
+			fmt.Println()
 	  }
 	}
 }
@@ -179,6 +210,10 @@ func crearEntrada(){
 		fmt.Println("Introduce contraseña del servicio: ")
 		password := leerStringConsola()
 
+		//Encriptamos la contraseña con AES-CRT y utilizando la clave maestra calculada
+		//a partir del password del usuario
+		passwordCifrado := cifrarContrasenyaEntrada(password)
+
 		fmt.Println("Introduce la web del servicio: ")
 		web := leerStringConsola()
 
@@ -192,7 +227,7 @@ func crearEntrada(){
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
 
 		//Pasamos el parámetro a la estructura Entrada
-		entrada := Entrada{Login: login, Password: password, Web: web, Descripcion: descripcion}
+		entrada := Entrada{Login: login, Password: passwordCifrado, Web: web, Descripcion: descripcion}
 		parametros.Set("entrada", codificarStructToJSONBase64(entrada))
 
 		//Pasar parámetros al servidor
@@ -205,14 +240,7 @@ func crearEntrada(){
 		fmt.Println(respuesta.Msg)
 	}
 }
-/*func modificar(usuario,dato string,id int,path string){
 
-  //p:=mapa[usuario].Entradas[id]
-  m:=mapa[usuario].Entradas[id]
-  m.Password=dato
-  mapa[usuario].Entradas[id]=m
-  altaEntrada(path)
-}*/
 func editarEntrada(){
 
 	//Si no hay usuario actual, no se hace nada
@@ -256,7 +284,8 @@ func editarEntrada(){
             aux.Login=dato
 					break
 				case "2":
-            aux.Password=dato
+						datoCifrado:= cifrarContrasenyaEntrada(dato)
+            aux.Password=datoCifrado
 					break
 				case "3":
 	          aux.Web=dato
@@ -468,8 +497,6 @@ func leerStringConsola()(string){
 	return strings.TrimSpace(lectura) // quitamos los espacios
 }
 
-
-
 /**
 * Método para comunicar con el servidor pasándole una serie de parámetros (url.Values)
 * Devuelve la respuesta del body codificado en bytes, para que sea el propio
@@ -520,6 +547,38 @@ func decodificarJSONBase64ToJSON(cadenaCodificada string)([]byte){
 	//Pasamos a []byte de JSON
 	respuesta := []byte(cadena)
 	return respuesta
+}
+
+func cifrarContrasenyaEntrada(pass string)(string){
+	return base64.StdEncoding.EncodeToString(encrypt([]byte(pass), claveMaestra))
+}
+
+func descifrarContrasenyaEntrada(pass string)(string){
+	decode, error := base64.StdEncoding.DecodeString(pass)
+	checkError(error)
+	cadena := string(decrypt(decode, claveMaestra))
+	return cadena
+}
+
+// función para cifrar (con AES en este caso), adjunta el IV al principio
+func encrypt(data, key []byte) (out []byte) {
+	out = make([]byte, len(data)+16)    // reservamos espacio para el IV al principio
+	rand.Read(out[:16])                 // generamos el IV
+	blk, err := aes.NewCipher(key)      // cifrador en bloque (AES), usa key
+	checkError(err)                            // comprobamos el error
+	ctr := cipher.NewCTR(blk, out[:16]) // cifrador en flujo: modo CTR, usa IV
+	ctr.XORKeyStream(out[16:], data)    // ciframos los datos
+	return
+}
+
+// función para descifrar (con AES en este caso)
+func decrypt(data, key []byte) (out []byte) {
+	out = make([]byte, len(data)-16)     // la salida no va a tener el IV
+	blk, err := aes.NewCipher(key)       // cifrador en bloque (AES), usa key
+	checkError(err)                             // comprobamos el error
+	ctr := cipher.NewCTR(blk, data[:16]) // cifrador en flujo: modo CTR, usa IV
+	ctr.XORKeyStream(out, data[16:])     // desciframos (doble cifrado) los datos
+	return
 }
 
 /**
