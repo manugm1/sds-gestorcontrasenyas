@@ -7,7 +7,8 @@ import (
 	"crypto/tls"
 	"crypto/aes"
 	"crypto/cipher"
-	"math/rand"
+	"crypto/rand"
+	X "math/rand"
 	"crypto/sha512"
 	"fmt"
 	"io/ioutil"
@@ -61,14 +62,14 @@ var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY
 func randLetter(n int) string {
     b := make([]rune, n)
     for i := range b {
-        b[i] = letters[rand.Intn(len(letters))]
+        b[i] = letters[X.Intn(len(letters))]
     }
     return string(b)
 }
 func randLettersNumbers(n int) string {
     b := make([]rune, n)
     for i := range b {
-        b[i] = lettersNumbers[rand.Intn(len(lettersNumbers))]
+        b[i] = lettersNumbers[X.Intn(len(lettersNumbers))]
     }
     return string(b)
 }
