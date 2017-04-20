@@ -197,6 +197,7 @@ func listarEntradas(){
 			fmt.Println(" ----- FIN Entrada ", i, " ----- ")
 			fmt.Println()
 	  }
+
 	}
 }
 
@@ -242,43 +243,38 @@ func crearEntrada(){
 }
 
 func editarEntrada(){
-
+   listarEntradas()
+	 var op = ""
 	//Si no hay usuario actual, no se hace nada
 	if usuarioActual != (Usuario{}) {
-		parametros := url.Values{}
-		parametros.Set("opcion", "5")
-
-		//Pasamos el parámetro a la estructura Usuario
-		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-
-		//Pasar parámetros al servidor
-		cadenaJSON := comunicarServidor(parametros)
-		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
-		var respuesta RespEntrada
-		//Des-serializamos el json a la estructura creada
-		error := json.Unmarshal(cadenaJSON, &respuesta)
-		checkError(error)
 
 		fmt.Println("Introduce id de la entrada: ")
 		id := leerStringConsola()
-    i, error := strconv.Atoi(id)
+		i, error := strconv.Atoi(id)
     checkError(error)
-		aux, ok := respuesta.Entradas[i]
-			if ok {
+		//var respuesta Entrada
+
+		aux  := obtenerEntradasPorId(i)
+			if aux!=(Entrada{}) {
 				fmt.Println("Login: ",aux.Login)
-				fmt.Println("Password: ",aux.Password)
+				fmt.Println("Password: ",descifrarContrasenyaEntrada(aux.Password))
 				fmt.Println("Web: ",aux.Web)
 				fmt.Println("Descripcion: ",aux.Descripcion)
-
+for{
 				fmt.Println("Elige opcion que quieres modificar: ")
 				fmt.Println("[1] Login")
 				fmt.Println("[2] Password")
 				fmt.Println("[3] Web")
 				fmt.Println("[4] Descripcion")
-				op := leerStringConsola()
+				fmt.Println("[q] Para salir")
+				op = leerStringConsola()
+				println("opcion elegida ",op)
+
+				if op == "1" || op == "2" || op == "3" || op == "4" {
 
 				fmt.Println("Inserta dato: ")
 				dato := leerStringConsola()
+
 				switch op {
 				case "1":
             aux.Login=dato
@@ -295,7 +291,7 @@ func editarEntrada(){
 						break
 
 				}
-        respuesta.Entradas[i]=aux
+        //respuesta.Entradas[i]=aux
 				parametros2 := url.Values{}
 				parametros2.Set("id",id)
 				parametros2.Set("opcion", "8")
@@ -305,7 +301,7 @@ func editarEntrada(){
 
 				//Pasamos el parámetro a la estructura Entrada
 
-				parametros2.Set("entrada", codificarStructToJSONBase64(respuesta.Entradas[i]))
+				parametros2.Set("entrada", codificarStructToJSONBase64(aux))
 
 				//Pasar parámetros al servidor
 				cadenaJSON := comunicarServidor(parametros2)
@@ -315,6 +311,11 @@ func editarEntrada(){
 				error := json.Unmarshal(cadenaJSON, &respuesta)
 				checkError(error)
 				fmt.Println(respuesta.Msg)
+				break
+			}else if op== "q"{
+				break
+			}
+		}
 
 			}else{
         fmt.Println("No existe Entrada con id ",i)
@@ -325,29 +326,18 @@ func editarEntrada(){
 }
 
 func borrarEntrada(){
+	//llamada al metodo listar entrada para demostrar las entradas disponibles
+	listarEntradas()
 	//Si no hay usuario actual, no se hace nada
 	if usuarioActual != (Usuario{}) {
-		parametros := url.Values{}
-		parametros.Set("opcion", "5")
-
-		//Pasamos el parámetro a la estructura Usuario
-		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-
-		//Pasar parámetros al servidor
-		cadenaJSON := comunicarServidor(parametros)
-		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
-		var respuesta RespEntrada
-		//Des-serializamos el json a la estructura creada
-		error := json.Unmarshal(cadenaJSON, &respuesta)
-		checkError(error)
 
 		fmt.Println("Introduce id de la entrada: ")
 		id := leerStringConsola()
     i, error := strconv.Atoi(id)
     checkError(error)
-		aux, ok := respuesta.Entradas[i]
-			if ok {
-        fmt.Println(aux)
+
+		aux  := obtenerEntradasPorId(i)
+			if aux!=(Entrada{}) {
 				parametros2 := url.Values{}
 				parametros2.Set("id",id)
 				parametros2.Set("opcion", "9")
@@ -370,7 +360,8 @@ func borrarEntrada(){
 }
 }
 
-func obtenerEntradasPorId(){
+func obtenerEntradasPorId(i int) Entrada{
+
 	//Si no hay usuario actual, no se hace nada
 	if usuarioActual != (Usuario{}) {
 		parametros := url.Values{}
@@ -382,24 +373,18 @@ func obtenerEntradasPorId(){
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
 		//El SERVIDOR DEBE DEVOLVER UN MAP DE ENTRADAS Y EL CLIENTE RECORRERLO Y MOSTRARLO POR PANTALLA
-		var respuesta RespEntrada
+    var respuesta RespEntrada
 		//Des-serializamos el json a la estructura creada
 		error := json.Unmarshal(cadenaJSON, &respuesta)
 		checkError(error)
 
-		fmt.Println("Introduce id de la entrada: ")
-		id := leerStringConsola()
-    i, error := strconv.Atoi(id)
-    checkError(error)
 		aux, ok := respuesta.Entradas[i]
 			if ok {
-				fmt.Println(aux)
-
-			}else{
-        fmt.Println("No existe Entrada con id ",i)
+				return aux
 
 			}
 	}
+	return Entrada{}
 }
 
 func main() {
@@ -449,10 +434,9 @@ func menuPrincipal(){
 		fmt.Println("-------¡Bienvenido!-------")
 		fmt.Println("-------Elige opción [1-4] o 'q' para cerrar sesión-------")
 		fmt.Println("[1] Listar entradas")
-		fmt.Println("[2] Obtener entrada")
-		fmt.Println("[3] Añadir entrada")
-		fmt.Println("[4] Editar entrada")
-		fmt.Println("[5] Borrar entrada")
+		fmt.Println("[2] Añadir entrada")
+		fmt.Println("[3] Editar entrada")
+		fmt.Println("[4] Borrar entrada")
 		fmt.Println("[q] Cerrar sesión")
 		opcionElegida := leerStringConsola()
 
@@ -462,19 +446,14 @@ func menuPrincipal(){
 			listarEntradas()
 			break
 		case "2":
-				fmt.Println("Se ha elegido Obtener entrada")
-				obtenerEntradasPorId()
-				break
-
-		case "3":
 			fmt.Println("Se ha elegido crear entrada")
 			crearEntrada()
 			break
-		case "4":
+		case "3":
 			fmt.Println("Se ha elegido editar entrada")
 			editarEntrada()
 			break
-		case "5":
+		case "4":
 			fmt.Println("Se ha elegido borrar entrada")
 			borrarEntrada()
 			break
