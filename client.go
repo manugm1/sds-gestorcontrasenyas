@@ -7,7 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
+	"math/rand"
 	"crypto/sha512"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +16,7 @@ import (
 	"os"
 	"strings"
 	"strconv"
+
 )
 
 // respuesta del servidor
@@ -55,16 +56,75 @@ var claveMaestra []byte //clave maestra generada a partir de la contraseña
 												//de las cuentas
 var usuarioActual Usuario //usuario actual (logueado)
 
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+func randLetter(n int) string {
+    b := make([]rune, n)
+    for i := range b {
+        b[i] = letters[rand.Intn(len(letters))]
+    }
+    return string(b)
+}
+func randLettersNumbers(n int) string {
+    b := make([]rune, n)
+    for i := range b {
+        b[i] = lettersNumbers[rand.Intn(len(lettersNumbers))]
+    }
+    return string(b)
+}
+ func generarContrasenyaAleatoria() string{
+	 var numeroCaracteres string
+	 var password string
+	 var respuestaNumeros string
+	//pREGUNTAS
+	fmt.Println("¿Nº de caracteres?")
+	numeroCaracteres  = leerStringConsola()
+	for{
+	fmt.Println("¿Añadir números? S/N")
+	respuestaNumeros  = leerStringConsola()
+	 if strings.EqualFold(respuestaNumeros, "s") || strings.EqualFold(respuestaNumeros, "n"){
+		 break
+	 }else{
+
+		 fmt.Println("Hay que poner letra s/S o n/N")
+	 }
+  }
+	if strings.EqualFold(respuestaNumeros, "n"){
+		i, error := strconv.Atoi(numeroCaracteres)
+		checkError(error)
+		password = randLetter(i)
+	}else if strings.EqualFold(respuestaNumeros, "s"){
+		i, error := strconv.Atoi(numeroCaracteres)
+		checkError(error)
+		password = randLettersNumbers(i)
+	}
+	///... LO QUE SE TE OCURRA
+	//GENERAR CONTRASEÑA ALEATORIA SEGÚN LO QUE HA ELEGIDO EL USUARIO
+	return password
+} //que devuelva la contraseña aleatoria
+
 /**
 * [1] Operación de registro sobre el servidor
  */
 func registro() {
+	var password string
 	//Introducir usuario y contraseña
 	fmt.Println("Introduce email: ")
 	email := leerStringConsola()
 
-	fmt.Println("Introduce contraseña: ")
-	password := leerStringConsola()
+	/*fmt.Println("Introduce contraseña: ")
+	password := leerStringConsola()*/
+	//NUEVO: Antes de introducir la contraseña, el sistema preguntará
+	fmt.Println("¿Generar contraseña aleatoria? S/N")
+	respuestaPassword  := leerStringConsola()
+
+	if strings.EqualFold(respuestaPassword, "s"){
+		password = generarContrasenyaAleatoria()
+		fmt.Println("El password generado aleatoriamente es ",password)
+	}else {
+		fmt.Println("Introduce contraseña: ")
+		password = leerStringConsola()
+	}
 
 	//Generamos el hash del password a partir del password para enviarla al servidor
 	//ya con dicho hash
