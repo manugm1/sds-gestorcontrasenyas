@@ -55,7 +55,7 @@ type Entrada struct {
     Web string
     Descripcion string
 }
-var tokens = make(map[string]FactorDoble)
+var token FactorDoble
 var claveMaestra []byte //clave maestra generada a partir de la contraseña
 												//del usuario, que servirá para cifrar y descifrar las contraseñas
 												//de las cuentas
@@ -186,11 +186,11 @@ func login(){
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &respuesta)
 	checkError(error)
-	var t FactorDoble
+	//var t FactorDoble
 	//Manejamos la respuesta de login del servidor
 	if respuesta.Ok {
-		t.Token=respuesta.Token
-		tokens[usuario.Email]=t
+		token.Token=respuesta.Token
+		//tokens[usuario.Email]=t
 		usuarioActual = usuario
 	}
 
@@ -251,7 +251,7 @@ func listarEntradas(){
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
 
 		//pasar el token
-		parametros.Set("token", tokens[usuarioActual.Email].Token)
+		parametros.Set("token", token.Token)
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
@@ -307,7 +307,7 @@ func crearEntrada(){
 		parametros.Set("entrada", codificarStructToJSONBase64(entrada))
 
 		//pasar el token
-		parametros.Set("token", tokens[usuarioActual.Email].Token)
+		parametros.Set("token", token.Token)
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
@@ -382,7 +382,7 @@ for{
 				parametros2.Set("entrada", codificarStructToJSONBase64(aux))
 
 				//pasar el token
-				parametros2.Set("token", tokens[usuarioActual.Email].Token)
+				parametros2.Set("token", token.Token)
 
 				//Pasar parámetros al servidor
 				cadenaJSON := comunicarServidor(parametros2)
@@ -427,7 +427,7 @@ func borrarEntrada(){
 				parametros2.Set("usuario", codificarStructToJSONBase64(usuarioActual))
 
 				//pasar el token
-				parametros2.Set("token", tokens[usuarioActual.Email].Token)
+				parametros2.Set("token", token.Token)
 
 				//Pasar parámetros al servidor
 				cadenaJSON := comunicarServidor(parametros2)
@@ -456,7 +456,7 @@ func obtenerEntradasPorId(i int) Entrada{
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
 
 		//pasar el token
-		parametros.Set("token", tokens[usuarioActual.Email].Token)
+		parametros.Set("token", token.Token)
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
