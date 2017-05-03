@@ -24,6 +24,7 @@ import (
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
+	Dato Token //el token
 }
 
 // respuesta del servidor con peticiones sobre entradas
@@ -41,6 +42,9 @@ type Usuario struct{
 	Email string
 	Password string
 }
+type Token struct{
+  Dato2 string
+}
 
 /**
 * Contraseña entrada: cifrado con AES/CTR desde el cliente.
@@ -51,7 +55,7 @@ type Entrada struct {
     Web string
     Descripcion string
 }
-
+var token Token
 var claveMaestra []byte //clave maestra generada a partir de la contraseña
 												//del usuario, que servirá para cifrar y descifrar las contraseñas
 												//de las cuentas
@@ -182,12 +186,19 @@ func login(){
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &respuesta)
 	checkError(error)
+	//var t FactorDoble
 	//Manejamos la respuesta de login del servidor
 	if respuesta.Ok {
+		token.Dato2=respuesta.Dato.Dato2
+		//tokens[usuario.Email]=t
 		usuarioActual = usuario
 	}
+
 	//Mostramos sí o sí lo que nos devuelve como respuesta el servidor
 	fmt.Println(respuesta.Msg)
+  // Mostramos el token
+	fmt.Println(respuesta.Dato.Dato2)
+
 }
 
 func esLogueado() (bool){
@@ -238,6 +249,9 @@ func listarEntradas(){
 
 		//Pasamos el parámetro a la estructura Usuario
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//pasar el token
+		parametros.Set("token", codificarStructToJSONBase64(token))
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
@@ -291,6 +305,9 @@ func crearEntrada(){
 		//Pasamos el parámetro a la estructura Entrada
 		entrada := Entrada{Login: login, Password: passwordCifrado, Web: web, Descripcion: descripcion}
 		parametros.Set("entrada", codificarStructToJSONBase64(entrada))
+
+		//pasar el token
+		parametros.Set("token", codificarStructToJSONBase64(token))
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
@@ -364,6 +381,9 @@ for{
 
 				parametros2.Set("entrada", codificarStructToJSONBase64(aux))
 
+				//pasar el token
+				parametros2.Set("token", codificarStructToJSONBase64(token))
+
 				//Pasar parámetros al servidor
 				cadenaJSON := comunicarServidor(parametros2)
 
@@ -405,6 +425,10 @@ func borrarEntrada(){
 
 				//Pasamos el parámetro a la estructura Usuario
 				parametros2.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+				//pasar el token
+				parametros2.Set("token", codificarStructToJSONBase64(token))
+
 				//Pasar parámetros al servidor
 				cadenaJSON := comunicarServidor(parametros2)
 
@@ -430,6 +454,9 @@ func obtenerEntradasPorId(i int) Entrada{
 
 		//Pasamos el parámetro a la estructura Usuario
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//pasar el token
+		parametros.Set("token", codificarStructToJSONBase64(token))
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)

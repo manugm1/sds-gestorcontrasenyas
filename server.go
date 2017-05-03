@@ -16,12 +16,14 @@ import (
 	"io"
 	"golang.org/x/crypto/scrypt" //para instalar: go get "golang.org/x/crypto/scrypt"
 															//es un subrepositorio, ruta completa
+  jwt "github.com/dgrijalva/jwt-go"
 )
 
 // respuesta por defecto del servidor
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
+	Dato Token // el token
 }
 
 // respuesta del servidor con peticiones sobre entradas
@@ -44,10 +46,14 @@ type Entrada struct {
     Web string
     Descripcion string
 }
-
+type Token struct{
+  Dato2 string
+}
 type Sesion struct {
 		Email string
 		TiempoLimite time.Time
+		Dato Token
+
 }
 
 //Declaramos y/o inicializamos variables globales
@@ -244,7 +250,35 @@ func registro(w http.ResponseWriter, request *http.Request){
 	}
 	comunicarCliente(w, r)
 }
+//*jwt.Token
+func crearToken(userEmail string) string{
+	mySigningKey := []byte(userEmail)
 
+	// Create the Claims
+	claims := &jwt.StandardClaims{
+			//NotBefore: int64(time.Now().Unix() - 1000),
+			ExpiresAt: int64(time.Now().Unix() + 90),
+			Issuer:    userEmail,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	ss, err := token.SignedString(mySigningKey)
+	checkError(err)
+	//fmt.Println("token:", ss)
+	/*t, err := jwt.Parse(ss, func(*jwt.Token) (interface{}, error) {
+			return mySigningKey, nil
+	})
+
+	if err != nil {
+			fmt.Println("parase with claims failed.", err)
+			return ""
+	}
+	fmt.Println("token claim:", t.Claims)*/
+
+	return ss
+
+
+}
 func login(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSON := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
@@ -268,20 +302,25 @@ func login(w http.ResponseWriter, request *http.Request){
 			checkError(error4)
 			passIntroducidoCliente := base64.StdEncoding.EncodeToString(hash)
 			if usuarios[usuario.Email].Password == passIntroducidoCliente {
+
+				//se genera el token
+				var token Token
+         token.Dato2 = crearToken(usuario.Email)
+				 fmt.Println(token.Dato2)
 				//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
 				sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
                                  time.Minute * time.Duration(1) +
-                                 time.Second * time.Duration(30))}
+                                 time.Second * time.Duration(30)), Dato : token }
 				sesiones[usuario.Email] = sesion
-				r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente."}    // formateamos respuesta
+				r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente.", Dato: token }    // formateamos respuesta
 			}else{
-				r = Resp{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo."}    // formateamos respuesta
+				r = Resp{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
 			}
 	  }else{
-			r = Resp{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo."}    // formateamos respuesta
+			r = Resp{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
 		}
 	}else{
-		r = Resp{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo."}    // formateamos respuesta
+		r = Resp{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
 	}
 	comunicarCliente(w, r)
 }
@@ -332,18 +371,21 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
 	cadenaJSONEntrada := decodificarJSONBase64ToJSON(request.Form.Get("entrada"))
-
+  cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
 	var usuario Usuario
 	var entrada Entrada
+	var token Token
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
 	error2 := json.Unmarshal(cadenaJSONEntrada, &entrada)
 	checkError(error2)
+	error3 := json.Unmarshal(cadenaJSONtoken, &token)
+	checkError(error3)
 	r := Resp{}
 	//Si está logueado el usuario en el sistema, entonces podemos crear la entrada
 	//Si no, error ya que se le ha acabado la sesión
-	if esEmailLogueado(usuario.Email) {
+	if esEmailLogueado(usuario.Email) &&  sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		//Las entradas empezarán en el 1
 		usuarios[usuario.Email].Entradas[len(usuarios[usuario.Email].Entradas)+1] = entrada
 		r = Resp{Ok: true, Msg: "Entrada creada con éxito."}
@@ -357,15 +399,17 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 func listarEntradas(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
-
+  cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
 	var usuario Usuario
-
+  var token Token
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
-
+	error2 := json.Unmarshal(cadenaJSONtoken, &token)
+	checkError(error2)
 	r:= RespEntrada{}
-	if esEmailLogueado(usuario.Email) {
+
+	if esEmailLogueado(usuario.Email) &&  sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		r = RespEntrada{Ok: true, Msg: "Devolviendo entradas.", Entradas: usuarios[usuario.Email].Entradas}
 	} else {
 		r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
@@ -381,18 +425,22 @@ func modificarEntrada(w http.ResponseWriter, request *http.Request){
 	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
 	cadenaJSONEntrada := decodificarJSONBase64ToJSON(request.Form.Get("entrada"))
 	opcion := request.Form.Get("id")
+	cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
 
 	var usuario Usuario
 	var entrada Entrada
+	var token Token
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
 	error2 := json.Unmarshal(cadenaJSONEntrada, &entrada)
 	checkError(error2)
+	error3 := json.Unmarshal(cadenaJSONtoken, &token)
+	checkError(error3)
 	r := Resp{}
 	//Si está logueado el usuario en el sistema, entonces podemos crear la entrada
 	//Si no, error ya que se le ha acabado la sesión
-	if esEmailLogueado(usuario.Email) {
+	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		i, error := strconv.Atoi(opcion)
 		checkError(error)
 		//se pasa el id de la entrada al que se pretende modificar
@@ -411,14 +459,17 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
 	opcion := request.Form.Get("id")
-
+  cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
 	var usuario Usuario
+	var token Token
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
+	error2 := json.Unmarshal(cadenaJSONtoken, &token)
+	checkError(error2)
 
 	r := Resp{}
-	if esEmailLogueado(usuario.Email) {
+	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2 {
 		i, error := strconv.Atoi(opcion)
 		checkError(error)
 		//se pasa el id de la entrada al que se pretende borrar
@@ -435,14 +486,17 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 func obtenerEntradasPorId(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
 	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
-	var usuario Usuario
+	cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
 
+	var usuario Usuario
+  var token Token
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
-
+	error2 := json.Unmarshal(cadenaJSONtoken, &token)
+	checkError(error2)
 	r:= RespEntrada{}
-	if esEmailLogueado(usuario.Email) {
+	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		   r = RespEntrada{Ok: true, Msg: "Devolviendo entrada.",Entradas: usuarios[usuario.Email].Entradas}
 	} else {
 		   r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
