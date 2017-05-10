@@ -17,7 +17,6 @@ import (
 	"golang.org/x/crypto/scrypt" //para instalar: go get "golang.org/x/crypto/scrypt"
 															//es un subrepositorio, ruta completa
   jwt "github.com/dgrijalva/jwt-go"
-	X "math/rand"
 )
 
 // respuesta por defecto del servidor
@@ -63,7 +62,7 @@ var bbdd *os.File
 var usuarios = make(map[string]Usuario)
 var entradas = make(map[int]Entrada)
 var sesiones = make(map[string]Sesion)
-var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+
 // función para escribir una respuesta del servidor al cliente
 func comunicarCliente(w http.ResponseWriter, estructura interface{}) {
 	w.Write([]byte(codificarStructToJSONBase64(estructura))) // escribimos el JSON resultante
@@ -163,10 +162,6 @@ func handler(w http.ResponseWriter, request *http.Request) {
 			break
 		case "9": //Borrar entrada
 		  borrarEntrada(w, request)
-		case "10": //Modificar contraseña de usuario
-			modificarUsuario(w, request)
-		case "11": //Modificar contraseña de usuario
-			darBajaUsuario(w, request)
 			break
 		default:
 			resp := Resp{Ok: false, Msg: "Comando inválido"}    // formateamos respuesta
@@ -255,21 +250,9 @@ func registro(w http.ResponseWriter, request *http.Request){
 	}
 	comunicarCliente(w, r)
 }
-/**
-*funcion para devolver caracteres aleatorios
-*/
-	func randLettersNumbers() string {
-	    b := make([]rune, 50)
-	    for i := range b {
-	        b[i] = lettersNumbers[X.Intn(len(lettersNumbers))]
-	    }
-	    return string(b)
-	}
 //*jwt.Token
 func crearToken(userEmail string) string{
-	mySigningKey := []byte(randLettersNumbers())
-	//fmt.Println("random:",mySigningKey)
-	//mySigningKey := []byte(userEmail)
+	mySigningKey := []byte(userEmail)
 
 	// Create the Claims
 	claims := &jwt.StandardClaims{
@@ -519,71 +502,6 @@ func obtenerEntradasPorId(w http.ResponseWriter, request *http.Request){
 		   r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
 	}
 	comunicarCliente(w, r)
-}
-/*
-* funcion para dar baja a un cliente
-*/
-func darBajaUsuario(w http.ResponseWriter, request *http.Request){
-	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
-	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
-	cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
-	var usuario Usuario
-	var token Token
-	//Des-serializamos el json a la estructura creada
-	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
-	checkError(error)
-	error2 := json.Unmarshal(cadenaJSONtoken, &token)
-	checkError(error2)
-
-	r := Resp{}
-	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2 {
-		delete(usuarios,usuario.Email)
-		delete(sesiones, usuario.Email)
-		r = Resp{Ok: true, Msg: "Usuario Borrado con éxito."}
-	} else {
-		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
-	}
-
-	comunicarCliente(w, r)
-
-}
-/**
-*Modificar contraseña de usuario
-*/
-func modificarUsuario(w http.ResponseWriter, request *http.Request){
-	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
-	cadenaJSONUsuario := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
-	cadenaJSONtoken := decodificarJSONBase64ToJSON(request.Form.Get("token"))
-
-	var usuario Usuario
-  var token Token
-  //Des-serializamos el json a la estructura creada
-  error := json.Unmarshal(cadenaJSONUsuario, &usuario)
-  checkError(error)
-  error2 := json.Unmarshal(cadenaJSONtoken, &token)
-  checkError(error2)
-  r:= Resp{}
-  if esEmailLogueado(usuario.Email){ //&& sesiones[usuario.Email].Dato.Dato2==token.Dato2{
-		salt := make([]byte, 32)
-		_, error2 := io.ReadFull(rand.Reader, salt)
-		checkError(error2)
-		//Recibimos del cliente base64(SHA256(passwordIntroducidaConsola))
-		//Se realiza ahora -> scrypt(decodebase64(SHA256(passwordIntroducidaConsola)), salt)
-		pass, error3 := base64.StdEncoding.DecodeString(usuario.Password)
-		checkError(error3)
-		hash, error4 := scrypt.Key(pass, salt, 16384, 8, 1, 32)
-		checkError(error4)
-		usuario.Password = base64.StdEncoding.EncodeToString(hash)
-		usuario.Salt = base64.StdEncoding.EncodeToString(salt)
-		//Lo agregamos al mapa global de usuarios
-		usuarios[usuario.Email] = usuario
-		r = Resp{Ok: true, Msg: "Contraseña modificada con exito."}    // formateamos respuesta
-  } else {
- 			r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
-  }
-  comunicarCliente(w, r)
-
-
 
 
 }

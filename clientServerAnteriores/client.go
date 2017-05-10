@@ -46,15 +46,6 @@ type Token struct{
   Dato2 string
 }
 
-
-type UsuarioMod struct{
-	Email string
-	Password string
-	Salt string
-	Entradas map[int] Entrada
-}
-
-
 /**
 * Contraseña entrada: cifrado con AES/CTR desde el cliente.
 */
@@ -69,7 +60,7 @@ var claveMaestra []byte //clave maestra generada a partir de la contraseña
 												//del usuario, que servirá para cifrar y descifrar las contraseñas
 												//de las cuentas
 var usuarioActual Usuario //usuario actual (logueado)
-var entradas = make(map[int]Entrada)//entradas
+
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 func randLetter(n int) string {
@@ -484,107 +475,6 @@ func obtenerEntradasPorId(i int) Entrada{
 	return Entrada{}
 }
 
-////metodo modificar ///////////////////////////////////////////////////////////
-/**
-* funcion para modificar contraseña de usuario
-*/
-func modificarContraseña(){
-
-	//Si no hay usuario actual, no se hace nada
-	if usuarioActual != (Usuario{}) {
-    var password string
-
-		//se pregunta si se genera la contraseña de forma aleatoria
-
-		fmt.Println("¿Generar contraseña aleatoria? S/N")
-		respuestaPassword  := leerStringConsola()
-
-		if strings.EqualFold(respuestaPassword, "s"){
-			password = generarContrasenyaAleatoria()
-			fmt.Println("El password generado aleatoriamente es ",password)
-		}else {
-			fmt.Println("Introduce contraseña: ")
-			password = leerStringConsola()
-		}
-
-			parametros := url.Values{}
-			parametros.Set("opcion", "5")
-
-			//Pasamos el parámetro a la estructura Usuario
-			parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-
-			//pasar el token
-			parametros.Set("token", codificarStructToJSONBase64(token))
-
-			//Pasar parámetros al servidor
-			cadenaJSON := comunicarServidor(parametros)
-			//El servidor devuelve un map de entradas del usuario que inicia sesion
-			var respuesta RespEntrada
-			//Des-serializamos el json a la estructura creada
-			error := json.Unmarshal(cadenaJSON, &respuesta)
-			checkError(error)
-			//Recorrer y mostrarfmt.Println(respuesta.Msg)
-
-			for i, m := range respuesta.Entradas {
-				 entradas[i] = Entrada{m.Login, descifrarContrasenyaEntrada(m.Password),m.Web, m.Descripcion}
-				 fmt.Println(entradas[i])
-			}
-			//Generamos el hash del password a partir del password para enviarla al servidor
-			//ya con dicho hash
-			  claveCliente := sha512.Sum512([]byte(password))
-			  passwordHash := base64.StdEncoding.EncodeToString(claveCliente[0:32]) // una mitad para cifrar datos (256 bits)
-		    claveMaestra = claveCliente[32:64] // una mitad para cifrar datos (256 bits)
-	    //fmt.Println(passwordHash, claveMaestra)
-
-			for i, m := range entradas {
-				 entradas[i] = Entrada{m.Login, cifrarContrasenyaEntrada(m.Password),m.Web, m.Descripcion}
-			}
-			//Generamos los parámetros a enviar al servidor
-			parametros2 := url.Values{}
-			parametros2.Set("opcion", "10")
-			//Pasamos el parámetro a la estructura Usuario
-			usuario := UsuarioMod{Email: usuarioActual.Email, Password: passwordHash, Salt:"", Entradas: entradas}
-			parametros2.Set("usuario", codificarStructToJSONBase64(usuario))
-			//pasar el token
-			parametros2.Set("token", codificarStructToJSONBase64(token))
-			//Pasar parámetros al servidor
-			cadenaJSON2 := comunicarServidor(parametros2)
-
-			var respuesta2 Resp
-			//Des-serializamos el json a la estructura creada
-			error2 := json.Unmarshal(cadenaJSON2, &respuesta2)
-			checkError(error2)
-			fmt.Println(respuesta2.Msg)
-	}
-
-}
-func darBajaUsuario(){
-
-	//Si no hay usuario actual, no se hace nada
-	if usuarioActual != (Usuario{}) {
-		parametros := url.Values{}
-		parametros.Set("opcion", "11")
-
-		//Pasamos el parámetro a la estructura Usuario
-		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-		//pasar el token
-		parametros.Set("token", codificarStructToJSONBase64(token))
-
-		//Pasar parámetros al servidor
-		cadenaJSON := comunicarServidor(parametros)
-		var respuesta Resp
-		//Des-serializamos el json a la estructura creada
-		error := json.Unmarshal(cadenaJSON, &respuesta)
-		checkError(error)
-		fmt.Println(respuesta.Msg)
-		os.Exit(1) //finalizamos el programa
-
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-
 func main() {
 	fmt.Println("-------GESTOR DE CONTRASEÑAS-------")
 	menu()
@@ -635,8 +525,6 @@ func menuPrincipal(){
 		fmt.Println("[2] Añadir entrada")
 		fmt.Println("[3] Editar entrada")
 		fmt.Println("[4] Borrar entrada")
-		fmt.Println("[5] Modificar contraseña usuario")
-		fmt.Println("[6] Dar baja usuario")
 		fmt.Println("[q] Cerrar sesión")
 		opcionElegida := leerStringConsola()
 
@@ -656,14 +544,6 @@ func menuPrincipal(){
 		case "4":
 			fmt.Println("Se ha elegido borrar entrada")
 			borrarEntrada()
-			break
-		case "5":
-			fmt.Println("Se ha elegido modificar contraseña")
-			modificarContraseña()
-			break
-		case "6":
-			fmt.Println("Se ha elegido dar baja usuario")
-			darBajaUsuario()
 			break
 		case "q", "Q":
 			fmt.Println("Se ha elegido cerrar sesión")
