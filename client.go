@@ -577,7 +577,7 @@ func darBajaUsuario(){
 		error := json.Unmarshal(cadenaJSON, &respuesta)
 		checkError(error)
 		fmt.Println(respuesta.Msg)
-		os.Exit(1) //finalizamos el programa
+		//os.Exit(1) //finalizamos el programa
 
 	}
 }
