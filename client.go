@@ -19,12 +19,20 @@ import (
 	"strconv"
 
 )
+// respuesta despues de comprobar si el usuario esta en la base de datos
+type RespLogin struct {
+	Ok  bool   // true -> correcto, false -> error
+	Msg string // mensaje adicional
+	//Dato Token // el token
+	Pin string
+}
 
 // respuesta del servidor
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	Dato Token //el token
+	Pin string
 }
 
 // respuesta del servidor con peticiones sobre entradas
@@ -50,7 +58,7 @@ type Token struct{
 type UsuarioMod struct{
 	Email string
 	Password string
-	Salt string
+	//Salt string
 	Entradas map[int] Entrada
 }
 
@@ -72,6 +80,7 @@ var usuarioActual Usuario //usuario actual (logueado)
 var entradas = make(map[int]Entrada)//entradas
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+var pinRecibido string
 func randLetter(n int) string {
     b := make([]rune, n)
     for i := range b {
@@ -163,7 +172,49 @@ func registro() {
 	//Mostramos lo que nos devuelve como respuesta el servidor
 	fmt.Println(respuesta.Msg)
 }
+/**
+*Comprobar pin
+**/
+func comprobarPin(){
 
+	//Si no hay usuario actual, no se hace nada
+	//if usuarioActual != (Usuario{}) {
+
+		//introducir el pin enviado por correo
+		fmt.Println("Introduce pin enviado por correo: ")
+		pin := leerStringConsola()
+
+		parametros := url.Values{}
+		parametros.Set("opcion", "12")
+    parametros.Set("pin", pin)
+		//Pasamos el parámetro a la estructura Usuario
+		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+
+		//pasar el token
+		//parametros.Set("token", codificarStructToJSONBase64(token))
+
+		//Pasar parámetros al servidor
+		cadenaJSON := comunicarServidor(parametros)
+
+		//El servidor devuelve un map de entradas y el CLIENTE
+		//lo debe recorrer para mostrarlo por pantalla
+		var respuesta Resp
+
+		//Des-serializamos el json a la estructura creada
+		error := json.Unmarshal(cadenaJSON, &respuesta)
+		checkError(error)
+		fmt.Println(respuesta.Msg)
+
+		if(pinRecibido == pin){
+			//fmt.Println(respuesta.Msg)
+			token.Dato2=respuesta.Dato.Dato2
+
+		}else{
+			fmt.Println(respuesta.Msg)
+		 fmt.Println("Debes introducri pin correcto")
+		}
+//}
+}
 /**
 * [2] Operación de login sobre el servidor
 * Prácticamente igual al registro pero tiene en cuenta la sesión
@@ -191,22 +242,27 @@ func login(){
 	//Pasar parámetros al servidor
 	cadenaJSON := comunicarServidor(parametros)
 
-	var respuesta Resp
+	var respuesta RespLogin
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &respuesta)
 	checkError(error)
 	//var t FactorDoble
 	//Manejamos la respuesta de login del servidor
+	fmt.Println(respuesta.Ok)
 	if respuesta.Ok {
-		token.Dato2=respuesta.Dato.Dato2
-		//tokens[usuario.Email]=t
-		usuarioActual = usuario
+    usuarioActual = usuario
+		pinRecibido = respuesta.Pin
+		fmt.Println("el pin recibido por correo es "+pinRecibido)
+		comprobarPin()
+
+	}else{
+		fmt.Println(respuesta.Msg)
 	}
 
 	//Mostramos sí o sí lo que nos devuelve como respuesta el servidor
-	fmt.Println(respuesta.Msg)
+	//fmt.Println(respuesta.Msg)
   // Mostramos el token
-	fmt.Println(respuesta.Dato.Dato2)
+	//fmt.Println(respuesta.Dato.Dato2)
 
 }
 
@@ -543,7 +599,7 @@ func modificarContraseña(){
 			parametros2 := url.Values{}
 			parametros2.Set("opcion", "10")
 			//Pasamos el parámetro a la estructura Usuario
-			usuario := UsuarioMod{Email: usuarioActual.Email, Password: passwordHash, Salt:"", Entradas: entradas}
+			usuario := UsuarioMod{Email: usuarioActual.Email, Password: passwordHash, Entradas: entradas}
 			parametros2.Set("usuario", codificarStructToJSONBase64(usuario))
 			//pasar el token
 			parametros2.Set("token", codificarStructToJSONBase64(token))

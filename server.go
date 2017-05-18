@@ -18,13 +18,24 @@ import (
 															//es un subrepositorio, ruta completa
   jwt "github.com/dgrijalva/jwt-go"
 	X "math/rand"
+	"net/smtp"
+	"net/mail"
+	"strings"
 )
 
+// respuesta despues de comprobar si el usuario esta en la base de datos
+type RespLogin struct {
+	Ok  bool   // true -> correcto, false -> error
+	Msg string // mensaje adicional
+	//Dato Token // el token
+	Pin string
+}
 // respuesta por defecto del servidor
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	Dato Token // el token
+	//Pin string
 }
 
 // respuesta del servidor con peticiones sobre entradas
@@ -37,6 +48,7 @@ type RespEntrada struct {
 type Usuario struct{
 	Email string
 	Password string
+	//Pin string
 	Salt string
 	Entradas map[int] Entrada
 }
@@ -64,6 +76,8 @@ var usuarios = make(map[string]Usuario)
 var entradas = make(map[int]Entrada)
 var sesiones = make(map[string]Sesion)
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+var pin string
+
 // función para escribir una respuesta del servidor al cliente
 func comunicarCliente(w http.ResponseWriter, estructura interface{}) {
 	w.Write([]byte(codificarStructToJSONBase64(estructura))) // escribimos el JSON resultante
@@ -168,6 +182,9 @@ func handler(w http.ResponseWriter, request *http.Request) {
 		case "11": //Modificar contraseña de usuario
 			darBajaUsuario(w, request)
 			break
+			case "12": //Comprobar si el pin del usuario es correcto
+				comprobarPin(w, request)
+				break
 		default:
 			resp := Resp{Ok: false, Msg: "Comando inválido"}    // formateamos respuesta
 			comunicarCliente(w, resp)
@@ -211,7 +228,7 @@ func tienePermisosOpciones(w http.ResponseWriter, request *http.Request, opcion 
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &usuario)
 	checkError(error)
-	if !esEmailLogueado(usuario.Email) && opcion != "1" && opcion != "2" && opcion != "3"{
+	if !esEmailLogueado(usuario.Email) && opcion != "1" && opcion != "2" && opcion != "3" && opcion != "12"{
 		ok = false
 	}
 	return
@@ -249,8 +266,13 @@ func registro(w http.ResponseWriter, request *http.Request){
 		checkError(error4)
 		usuario.Password = base64.StdEncoding.EncodeToString(hash)
 		usuario.Salt = base64.StdEncoding.EncodeToString(salt)
+		fmt.Println("la contraseña es "+ usuario.Password)
+		//pin := randLettersNumbers(10)
+		//usuario.Pin = pin
 		//Lo agregamos al mapa global de usuarios
 		usuarios[usuario.Email] = usuario
+		//mandar el factor doble
+
 		r = Resp{Ok: true, Msg: "Registrado con éxito. Inicia sesión para empezar."}    // formateamos respuesta
 	}
 	comunicarCliente(w, r)
@@ -258,8 +280,8 @@ func registro(w http.ResponseWriter, request *http.Request){
 /**
 *funcion para devolver caracteres aleatorios
 */
-	func randLettersNumbers() string {
-	    b := make([]rune, 50)
+	func randLettersNumbers(n int) string {
+	    b := make([]rune, n)
 	    for i := range b {
 	        b[i] = lettersNumbers[X.Intn(len(lettersNumbers))]
 	    }
@@ -267,7 +289,7 @@ func registro(w http.ResponseWriter, request *http.Request){
 	}
 //*jwt.Token
 func crearToken(userEmail string) string{
-	mySigningKey := []byte(randLettersNumbers())
+	mySigningKey := []byte(randLettersNumbers(50))
 	//fmt.Println("random:",mySigningKey)
 	//mySigningKey := []byte(userEmail)
 
@@ -303,12 +325,12 @@ func login(w http.ResponseWriter, request *http.Request){
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &usuario)
 	checkError(error)
-	r := Resp{}
+	r := RespLogin{}
 	//Comprobamos que el usuario existe en la base de datos
 	if existeUsuario(usuario.Email){
 		//Ahora comprobamos si Email y Contraseña enviada
 		//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
-		if usuarios[usuario.Email].Email == usuario.Email {
+		if usuarios[usuario.Email].Email == usuario.Email{
 			//Generamos el hash con el password pasado como parámetro
 			//y se compara con el que hay insertado en la bbdd (utiliza la salt almacenada en la bbdd)
 			pass, error2 := base64.StdEncoding.DecodeString(usuario.Password)
@@ -318,30 +340,61 @@ func login(w http.ResponseWriter, request *http.Request){
 			hash, error4 := scrypt.Key(pass, salt, 16384, 8, 1, 32)
 			checkError(error4)
 			passIntroducidoCliente := base64.StdEncoding.EncodeToString(hash)
+
 			if usuarios[usuario.Email].Password == passIntroducidoCliente {
 
-				//se genera el token
-				var token Token
-         token.Dato2 = crearToken(usuario.Email)
-				 fmt.Println(token.Dato2)
-				//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
-				sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
-                                 time.Minute * time.Duration(1) +
-                                 time.Second * time.Duration(30)), Dato : token }
-				sesiones[usuario.Email] = sesion
-				r = Resp{Ok: true, Msg: "El usuario se ha logueado correctamente.", Dato: token }    // formateamos respuesta
+				pin = randLettersNumbers(10)
+				senMail(pin)
+
+				r = RespLogin{Ok: true, Msg: "El usuario se ha logueado correctamente." , Pin:pin }    // formateamos respuesta
 			}else{
-				r = Resp{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
+				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Pin:""}    // formateamos respuesta
 			}
 	  }else{
-			r = Resp{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
+			r = RespLogin{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo.",Pin:""}    // formateamos respuesta
 		}
 	}else{
-		r = Resp{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
+		r = RespLogin{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.",Pin:""}    // formateamos respuesta
 	}
 	comunicarCliente(w, r)
 }
 
+func comprobarPin(w http.ResponseWriter, request *http.Request){
+//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
+cadenaJSON := decodificarJSONBase64ToJSON(request.Form.Get("usuario"))
+//cadenaPin := decodificarJSONBase64ToJSON(request.Form.Get("pin"))
+cadenaPin := request.Form.Get("pin")
+var usuario Usuario
+
+//Des-serializamos el json a la estructura creada
+error := json.Unmarshal(cadenaJSON, &usuario)
+checkError(error)
+r := Resp{}
+
+//Comprobamos que el usuario existe en la base de datos
+if existeUsuario(usuario.Email){
+	//Ahora comprobamos si Email y Contraseña enviada
+	//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
+	if usuarios[usuario.Email].Email == usuario.Email &&  pin == string(cadenaPin){
+		//se genera el token
+		var token Token
+		token.Dato2 = crearToken(usuario.Email)
+		fmt.Println(token.Dato2)
+		//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
+           sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
+												 time.Minute * time.Duration(1) +
+												 time.Second * time.Duration(30)), Dato : token }
+           sesiones[usuario.Email] = sesion
+		r = Resp{Ok: true, Msg: "El pin introducido es correcto.", Dato: token }    // formateamos respuesta
+	}else{
+		r = Resp{Ok: false, Msg: "El pin no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
+	}
+comunicarCliente(w, r)
+}
+}
+/**
+*
+*/
 /**
 * Comprueba si el usuario está con la sesión iniciada y devuelve una respuesta al cliente
 */
@@ -624,6 +677,59 @@ func cargarDatos(){
 	json.Unmarshal(datosBBDD, &usuarios)
 }
 
+/*
+*Funcion para mandar el email
+*/
+
+func senMail(pin string){
+
+	// Set up authentication information.
+	auth := smtp.PlainAuth(
+		"",
+		"infochamit@gmail.com",
+		"Ouadi1981.",
+		"smtp.gmail.com",
+	)
+	from := mail.Address{"Chamit Ouadi", "infochamit@gmail.com"}
+	to := mail.Address{"Manuel Garcia Menarguez", "infoouadi@gmail.com"}
+	title := "Nuevo pin - Gestor de contraseñas"
+
+	body := "Hola \nBienvenido a Gestor de contraseñas.\n" +
+	"Te has registrado correctamente pero para poder acceder al sistema necesitarás un pin generado automáticamente y de forma segura." +
+	"Es el siguiente:\n" +  pin + "\nEsperemos que disfrutes de nuestro servicio." +
+	"\nMuchas gracias.";
+
+	header := make(map[string]string)
+	header["From"] = from.String()
+	header["To"] = to.String()
+	header["Subject"] = encodeRFC2047(title)
+	header["MIME-Version"] = "1.0"
+	header["Content-Type"] = "text/plain; charset=\"utf-8\""
+	header["Content-Transfer-Encoding"] = "base64"
+
+	message := ""
+	for k, v := range header {
+		message += fmt.Sprintf("%s: %s\r\n", k, v)
+	}
+	message += "\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
+
+	// Connect to the server, authenticate, set the sender and recipient,
+	// and send the email all in one step.
+	error := smtp.SendMail(
+		 "smtp.gmail.com:587",
+		auth,
+		from.Address,
+		[]string{to.Address},
+		[]byte(message),
+		//[]byte("This is the email body."),
+	)
+	checkError(error)
+}
+func encodeRFC2047(String string) string{
+	// use mail's rfc2047 to encode any string
+	addr := mail.Address{String, ""}
+	return strings.Trim(addr.String(), " <>")
+}
 /**
 * Función que chequea los errores y muestra por pantalla en caso de haber alguno
  */
