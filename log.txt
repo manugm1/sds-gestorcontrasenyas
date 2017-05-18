@@ -1,0 +1,9 @@
+2017/05/18 20:15:51 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/18 20:15:51 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/18 20:16:00 Usuario infoouadi@gmail.com ha puesto pin correcto
+2017/05/18 20:16:01 Usuario infoouadi@gmail.com solicita sus entradas
+2017/05/18 20:16:12 Usuario infoouadi@gmail.com ha creado nueva entrada
+2017/05/18 20:16:15 Usuario infoouadi@gmail.com ha cerrado sesion
+2017/05/18 20:16:17 Volcando datos recopilados en la BBDD...
+2017/05/18 20:16:17 Apagando servidor ...
+2017/05/18 20:16:17 Servidor detenido correctamente

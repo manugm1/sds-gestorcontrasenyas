@@ -101,6 +101,16 @@ func main() {
 		}
 	}()
 
+ //create your file with desired read/write permissions
+        f, err := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+        if err != nil {
+                checkError(err)
+        }
+
+				//defer to close when you're done with it, not because you think it's idiomatic!
+        defer f.Close()
+        //set output of logs to f
+         log.SetOutput(f)
 	//Abrimos la conexión con la base de datos (fichero)
 	//Para poder obtener la información
 	bbdd, _ = os.Open(rutaBBDD)
@@ -149,6 +159,7 @@ func handler(w http.ResponseWriter, request *http.Request) {
 	switch opcion { // comprobamos comando desde el cliente
 		case "0": //caso básico para no permitir
 			resp := Resp{Ok: false, Msg: "Operación no permitida. No ha iniciado sesión."} // formateamos respuesta
+
 			comunicarCliente(w, resp)
 			break
 		case "1": // registro
@@ -228,7 +239,7 @@ func tienePermisosOpciones(w http.ResponseWriter, request *http.Request, opcion 
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSON, &usuario)
 	checkError(error)
-	if !esEmailLogueado(usuario.Email) && opcion != "1" && opcion != "2" && opcion != "3" && opcion != "12"{
+	if !esEmailLogueado(usuario.Email) && opcion != "1" && opcion != "2" && opcion != "3" && opcion != "12" {
 		ok = false
 	}
 	return
@@ -249,6 +260,8 @@ func registro(w http.ResponseWriter, request *http.Request){
 	//Comprobamos que el usuario existe en la base de datos
 	if existeUsuario(usuario.Email){
 		r = Resp{Ok: false, Msg: "El usuario ya existe, vuelve a intentarlo con otros datos."}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " existe en la base de datos, no se puede registrar dos veces")
+
 	}else{
 		//Si no existe, procedemos a crearlo
 		//Inicializamos las entradas como vacías (lógicamente no tiene ninguna)
@@ -274,6 +287,9 @@ func registro(w http.ResponseWriter, request *http.Request){
 		//mandar el factor doble
 
 		r = Resp{Ok: true, Msg: "Registrado con éxito. Inicia sesión para empezar."}    // formateamos respuesta
+		//test case
+    log.Println("Usuario "+ usuario.Email + " se ha registrado correctamente")
+
 	}
 	comunicarCliente(w, r)
 }
@@ -347,14 +363,18 @@ func login(w http.ResponseWriter, request *http.Request){
 				senMail(usuario.Email,pin)
 
 				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir." , Pin:pin }    // formateamos respuesta
+				log.Println("Usuario "+ usuario.Email + " se ha logeado correctamente")
 			}else{
 				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Pin:""}    // formateamos respuesta
+				log.Println("Usuario "+ usuario.Email + " ha introducido contraseña incorrecta")
 			}
 	  }else{
 			r = RespLogin{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo.",Pin:""}    // formateamos respuesta
+			log.Println("Usuario "+ usuario.Email + " se ha puesto datos erroneos")
 		}
 	}else{
 		r = RespLogin{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.",Pin:""}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " no existe en la base de datos")
 	}
 	comunicarCliente(w, r)
 }
@@ -386,8 +406,10 @@ if existeUsuario(usuario.Email){
 												 time.Second * time.Duration(30)), Dato : token }
            sesiones[usuario.Email] = sesion
 		r = Resp{Ok: true, Msg: "El pin introducido es correcto.", Dato: token }    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " ha puesto pin correcto")
 	}else{
 		r = Resp{Ok: false, Msg: "El pin no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " ha puesto pin incorrecto")
 	}
 comunicarCliente(w, r)
 }
@@ -430,8 +452,10 @@ func logout(w http.ResponseWriter, request *http.Request){
 		//Borramos del mapa de sesiones
 		delete(sesiones, usuario.Email)
 		r = Resp{Ok: true, Msg: "Sesión cerrada con éxito."}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " ha cerrado sesion")
 	} else{
 		r = Resp{Ok: false, Msg: "La sesión ya está cerrada."}
+		log.Println("Usuario "+ usuario.Email + " intenta cerrar sesion, y esta cerrada antes")
 	}
 
 	comunicarCliente(w, r)
@@ -445,6 +469,7 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 	var usuario Usuario
 	var entrada Entrada
 	var token Token
+	cont := 1
 	//Des-serializamos el json a la estructura creada
 	error := json.Unmarshal(cadenaJSONUsuario, &usuario)
 	checkError(error)
@@ -456,11 +481,23 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 	//Si está logueado el usuario en el sistema, entonces podemos crear la entrada
 	//Si no, error ya que se le ha acabado la sesión
 	if esEmailLogueado(usuario.Email) &&  sesiones[usuario.Email].Dato.Dato2==token.Dato2{
-		//Las entradas empezarán en el 1
-		usuarios[usuario.Email].Entradas[len(usuarios[usuario.Email].Entradas)+1] = entrada
+		for {
+			if _,ok := usuarios[usuario.Email].Entradas[cont]; ok{
+				 cont++
+			}else{
+				//fmt.Println("ha entrado a crear una entrada nueva")
+			usuarios[usuario.Email].Entradas[cont] = entrada
+			//len(usuarios[usuario.Email].Entradas)+1
+			break
+		}
+		}
+
+
 		r = Resp{Ok: true, Msg: "Entrada creada con éxito."}
+		log.Println("Usuario "+ usuario.Email + " ha creado nueva entrada")
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+		log.Println("Usuario "+ usuario.Email + " inetenta crear entrada con sesion cerrada")
 	}
 	//anyadirEntrada()
 	comunicarCliente(w, r)
@@ -481,8 +518,10 @@ func listarEntradas(w http.ResponseWriter, request *http.Request){
 
 	if esEmailLogueado(usuario.Email) &&  sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		r = RespEntrada{Ok: true, Msg: "Devolviendo entradas.", Entradas: usuarios[usuario.Email].Entradas}
+		log.Println("Usuario "+ usuario.Email + " solicita sus entradas")
 	} else {
 		r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
+		log.Println("Usuario "+ usuario.Email + " solicita listar entradas, cuando ha perdido la sesion")
 	}
 	comunicarCliente(w, r)
 }
@@ -516,8 +555,10 @@ func modificarEntrada(w http.ResponseWriter, request *http.Request){
 		//se pasa el id de la entrada al que se pretende modificar
 		usuarios[usuario.Email].Entradas[i]= entrada
 		r = Resp{Ok: true, Msg: "Entrada Modificada con éxito."}
+		log.Println("Usuario "+ usuario.Email + " solicita modificar entrada con exito")
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+		log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesion")
 	}
 	comunicarCliente(w, r)
 }
@@ -545,8 +586,10 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 		//se pasa el id de la entrada al que se pretende borrar
 		delete(usuarios[usuario.Email].Entradas, i)
 		r = Resp{Ok: true, Msg: "Entrada Borrada con éxito."}
+		log.Println("Usuario "+ usuario.Email + " solicita borrar entrada")
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+		log.Println("Usuario "+ usuario.Email + " solicita borrar entrada, cuando ha perdido la sesion")
 	}
 
 	comunicarCliente(w, r)
@@ -568,8 +611,10 @@ func obtenerEntradasPorId(w http.ResponseWriter, request *http.Request){
 	r:= RespEntrada{}
 	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		   r = RespEntrada{Ok: true, Msg: "Devolviendo entrada.",Entradas: usuarios[usuario.Email].Entradas}
+			 log.Println("Usuario "+ usuario.Email + " solicita entrada por identificador")
 	} else {
 		   r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
+			 log.Println("Usuario "+ usuario.Email + " solicita entrada por identificador, cuando ha perdido la sesion")
 	}
 	comunicarCliente(w, r)
 }
@@ -593,8 +638,10 @@ func darBajaUsuario(w http.ResponseWriter, request *http.Request){
 		delete(usuarios,usuario.Email)
 		delete(sesiones, usuario.Email)
 		r = Resp{Ok: true, Msg: "Usuario Borrado con éxito."}
+		log.Println("Usuario "+ usuario.Email + " solicita dar del baja del sistema")
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+		log.Println("Usuario "+ usuario.Email + " solicita dar de baja del sistema, cuando ha perdido la sesion")
 	}
 
 	comunicarCliente(w, r)
@@ -631,15 +678,14 @@ func modificarUsuario(w http.ResponseWriter, request *http.Request){
 		//Lo agregamos al mapa global de usuarios
 		usuarios[usuario.Email] = usuario
 		r = Resp{Ok: true, Msg: "Contraseña modificada con exito."}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + "  modificar contraseña con exito")
   } else {
  			r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
+			log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesion")
   }
   comunicarCliente(w, r)
-
-
-
-
 }
+
 /**
 * Codificamos en JSON una estructura cualquiera y
 * devolvemos codificado el JSON en base64
@@ -724,6 +770,7 @@ func senMail(email,pin string){
 		//[]byte("This is the email body."),
 	)
 	checkError(error)
+	log.Println("Usuario "+ email + " se le ha enviado pin para login con exito")
 }
 func encodeRFC2047(String string) string{
 	// use mail's rfc2047 to encode any string

@@ -19,11 +19,11 @@ import (
 	"strconv"
 
 )
+
 // respuesta despues de comprobar si el usuario esta en la base de datos
 type RespLogin struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
-	//Dato Token // el token
 	Pin string
 }
 
@@ -32,7 +32,7 @@ type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	Dato Token //el token
-	Pin string
+	//Pin string
 }
 
 // respuesta del servidor con peticiones sobre entradas
@@ -638,6 +638,7 @@ func darBajaUsuario(){
 	}
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -666,6 +667,7 @@ func menuInicio(){
 		fmt.Println("-------Elige opción [1-2] o 'q' para salir-------")
 		fmt.Println("[1] Registro")
 		fmt.Println("[2] Login")
+		//fmt.Println("[3] Recuperar contraseña")
 		fmt.Println("[q] Salir")
 		opcionElegida := leerStringConsola()
 
@@ -677,7 +679,6 @@ func menuInicio(){
 		case "2":
 			fmt.Println("Se ha elegido login")
 			login()
-			break
 		case "q", "Q":
 			fmt.Println("Se ha elegido SALIR")
 			os.Exit(1) //finalizamos el programa
