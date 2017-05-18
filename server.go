@@ -344,9 +344,9 @@ func login(w http.ResponseWriter, request *http.Request){
 			if usuarios[usuario.Email].Password == passIntroducidoCliente {
 
 				pin = randLettersNumbers(10)
-				senMail(pin)
+				senMail(usuario.Email,pin)
 
-				r = RespLogin{Ok: true, Msg: "El usuario se ha logueado correctamente." , Pin:pin }    // formateamos respuesta
+				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir." , Pin:pin }    // formateamos respuesta
 			}else{
 				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Pin:""}    // formateamos respuesta
 			}
@@ -681,7 +681,7 @@ func cargarDatos(){
 *Funcion para mandar el email
 */
 
-func senMail(pin string){
+func senMail(email,pin string){
 
 	// Set up authentication information.
 	auth := smtp.PlainAuth(
@@ -691,7 +691,7 @@ func senMail(pin string){
 		"smtp.gmail.com",
 	)
 	from := mail.Address{"Chamit Ouadi", "infochamit@gmail.com"}
-	to := mail.Address{"Manuel Garcia Menarguez", "infoouadi@gmail.com"}
+	to := mail.Address{email, email}
 	title := "Nuevo pin - Gestor de contraseñas"
 
 	body := "Hola \nBienvenido a Gestor de contraseñas.\n" +

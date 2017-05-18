@@ -173,7 +173,7 @@ func registro() {
 	fmt.Println(respuesta.Msg)
 }
 /**
-*Comprobar pin
+*Comprobar pin enviado al usuario por correo
 **/
 func comprobarPin(){
 
