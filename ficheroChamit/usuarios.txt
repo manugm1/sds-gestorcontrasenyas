@@ -1,4 +1,0 @@
-{"vv":{"User":"vv","Password":"yy",
-"Entradas":{"10":{"IdUsuario":1,"Login":"vv","Password":"xx","Web":"www.twitter.com","Descripcion":"lo que sea"},"2":{"IdUsuario":3,"Login":"xx","Password":"yy","Web":"www.twitter.com","Descripcion":"lo que sea"}}},
-"xx":{"User":"xx","Password":"yy",
-"Entradas":{"1":{"IdUsuario":3,"Login":"xx","Password":"xx","Web":"www.twitter.com","Descripcion":"lo que sea"},"2":{"IdUsuario":3,"Login":"xx","Password":"yy","Web":"www.twitter.com","Descripcion":"lo que sea"}}}}
