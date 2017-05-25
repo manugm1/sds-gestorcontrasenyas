@@ -17,6 +17,10 @@ import (
 	"os"
 	"strings"
 	"strconv"
+	"time"
+	"golang.org/x/crypto/ssh/terminal"
+	"syscall"
+  "github.com/badoux/checkmail"
 
 )
 
@@ -24,7 +28,7 @@ import (
 type RespLogin struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
-	Pin string
+	//Pin string
 }
 
 // respuesta del servidor
@@ -61,6 +65,9 @@ type UsuarioMod struct{
 	//Salt string
 	Entradas map[int] Entrada
 }
+type Sesion struct {
+		TiempoLimite time.Time
+}
 
 
 /**
@@ -81,8 +88,10 @@ var entradas = make(map[int]Entrada)//entradas
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 var pinRecibido string
+var sesionPin Sesion
 func randLetter(n int) string {
     b := make([]rune, n)
+		X.Seed(time.Now().UnixNano())
     for i := range b {
         b[i] = letters[X.Intn(len(letters))]
     }
@@ -90,6 +99,7 @@ func randLetter(n int) string {
 }
 func randLettersNumbers(n int) string {
     b := make([]rune, n)
+		X.Seed(time.Now().UnixNano())
     for i := range b {
         b[i] = lettersNumbers[X.Intn(len(lettersNumbers))]
     }
@@ -134,6 +144,10 @@ func registro() {
 	//Introducir usuario y contraseña
 	fmt.Println("Introduce email: ")
 	email := leerStringConsola()
+	err := checkmail.ValidateFormat(email)
+  checkError(err)
+  err2 := checkmail.ValidateHost(email)
+  checkError(err2)
 
 	/*fmt.Println("Introduce contraseña: ")
 	password := leerStringConsola()*/
@@ -146,7 +160,9 @@ func registro() {
 		fmt.Println("El password generado aleatoriamente es ",password)
 	}else {
 		fmt.Println("Introduce contraseña: ")
-		password = leerStringConsola()
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	  checkError(err)
+	  password = string(bytePassword)
 	}
 
 	//Generamos el hash del password a partir del password para enviarla al servidor
@@ -184,6 +200,9 @@ func comprobarPin(){
 		fmt.Println("Introduce pin enviado por correo: ")
 		pin := leerStringConsola()
 
+		//se comprueba si la sesion del pin, todavia esta activada
+		fechaHoraActual := time.Now()
+		if fechaHoraActual.Before(sesionPin.TiempoLimite) {
 		parametros := url.Values{}
 		parametros.Set("opcion", "12")
     parametros.Set("pin", pin)
@@ -205,7 +224,7 @@ func comprobarPin(){
 		checkError(error)
 		fmt.Println(respuesta.Msg)
 
-		if(pinRecibido == pin){
+		if(respuesta.Ok){
 			//fmt.Println(respuesta.Msg)
 			token.Dato2=respuesta.Dato.Dato2
 
@@ -213,6 +232,7 @@ func comprobarPin(){
 			fmt.Println(respuesta.Msg)
 		 fmt.Println("Debes introducri pin correcto")
 		}
+	}
 //}
 }
 /**
@@ -220,12 +240,22 @@ func comprobarPin(){
 * Prácticamente igual al registro pero tiene en cuenta la sesión
  */
 func login(){
+
+	//for{
 	//Introducir usuario y contraseña
 	fmt.Println("Introduce email: ")
 	email := leerStringConsola()
+	//aqui se valida el email, para comprobar si cumple con las restricciones y existe
+	err := checkmail.ValidateFormat(email)
+  checkError(err)
+  err2 := checkmail.ValidateHost(email)
+	checkError(err2)
 
+//}
 	fmt.Println("Introduce contraseña: ")
-	password := leerStringConsola()
+	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+  checkError(err)
+  password := string(bytePassword)
 
 	//Generamos clave maestra a partir del password que servirá para cifrar/descifrar
 	claveCliente := sha512.Sum512([]byte(password))
@@ -251,19 +281,14 @@ func login(){
 	fmt.Println(respuesta.Ok)
 	if respuesta.Ok {
     usuarioActual = usuario
-		pinRecibido = respuesta.Pin
-		fmt.Println("el pin recibido por correo es "+pinRecibido)
+		sesionPin = Sesion{TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
+									time.Minute * time.Duration(0) +
+									time.Second * time.Duration(30)) }
 		comprobarPin()
 
 	}else{
 		fmt.Println(respuesta.Msg)
 	}
-
-	//Mostramos sí o sí lo que nos devuelve como respuesta el servidor
-	//fmt.Println(respuesta.Msg)
-  // Mostramos el token
-	//fmt.Println(respuesta.Dato.Dato2)
-
 }
 
 func esLogueado() (bool){

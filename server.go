@@ -28,7 +28,7 @@ type RespLogin struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	//Dato Token // el token
-	Pin string
+	//Pin string
 }
 // respuesta por defecto del servidor
 type Resp struct {
@@ -284,11 +284,9 @@ func registro(w http.ResponseWriter, request *http.Request){
 		//usuario.Pin = pin
 		//Lo agregamos al mapa global de usuarios
 		usuarios[usuario.Email] = usuario
-		//mandar el factor doble
-
 		r = Resp{Ok: true, Msg: "Registrado con éxito. Inicia sesión para empezar."}    // formateamos respuesta
 		//test case
-    log.Println("Usuario "+ usuario.Email + " se ha registrado correctamente")
+    log.Println("Usuario "+ usuario.Email + " se ha registrado correctamente\n")
 
 	}
 	comunicarCliente(w, r)
@@ -298,6 +296,7 @@ func registro(w http.ResponseWriter, request *http.Request){
 */
 	func randLettersNumbers(n int) string {
 	    b := make([]rune, n)
+			X.Seed(time.Now().UnixNano())
 	    for i := range b {
 	        b[i] = lettersNumbers[X.Intn(len(lettersNumbers))]
 	    }
@@ -319,20 +318,8 @@ func crearToken(userEmail string) string{
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	ss, err := token.SignedString(mySigningKey)
 	checkError(err)
-	//fmt.Println("token:", ss)
-	/*t, err := jwt.Parse(ss, func(*jwt.Token) (interface{}, error) {
-			return mySigningKey, nil
-	})
-
-	if err != nil {
-			fmt.Println("parase with claims failed.", err)
-			return ""
-	}
-	fmt.Println("token claim:", t.Claims)*/
 
 	return ss
-
-
 }
 func login(w http.ResponseWriter, request *http.Request){
 	//Viene del cliente codificado en JSON en base64, lo pasamos a JSON simple
@@ -362,18 +349,18 @@ func login(w http.ResponseWriter, request *http.Request){
 				pin = randLettersNumbers(10)
 				senMail(usuario.Email,pin)
 
-				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir." , Pin:pin }    // formateamos respuesta
+				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir."  }    // formateamos respuesta
 				log.Println("Usuario "+ usuario.Email + " se ha logeado correctamente")
 			}else{
-				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo.", Pin:""}    // formateamos respuesta
+				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo."}    // formateamos respuesta
 				log.Println("Usuario "+ usuario.Email + " ha introducido contraseña incorrecta")
 			}
 	  }else{
-			r = RespLogin{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo.",Pin:""}    // formateamos respuesta
+			r = RespLogin{Ok: false, Msg: "No coinciden los parámetros del usuario. Vuelve a intentarlo."}    // formateamos respuesta
 			log.Println("Usuario "+ usuario.Email + " se ha puesto datos erroneos")
 		}
 	}else{
-		r = RespLogin{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.",Pin:""}    // formateamos respuesta
+		r = RespLogin{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo."}    // formateamos respuesta
 		log.Println("Usuario "+ usuario.Email + " no existe en la base de datos")
 	}
 	comunicarCliente(w, r)
@@ -399,7 +386,7 @@ if existeUsuario(usuario.Email){
 		//se genera el token
 		var token Token
 		token.Dato2 = crearToken(usuario.Email)
-		fmt.Println(token.Dato2)
+		//fmt.Println(token.Dato2)
 		//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
            sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
 												 time.Minute * time.Duration(1) +
@@ -495,6 +482,8 @@ func crearEntrada(w http.ResponseWriter, request *http.Request){
 
 		r = Resp{Ok: true, Msg: "Entrada creada con éxito."}
 		log.Println("Usuario "+ usuario.Email + " ha creado nueva entrada")
+		//llamada a la funcion para reiniciar la sesion
+    reiniciarSesion(usuario)
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 		log.Println("Usuario "+ usuario.Email + " inetenta crear entrada con sesion cerrada")
@@ -519,6 +508,8 @@ func listarEntradas(w http.ResponseWriter, request *http.Request){
 	if esEmailLogueado(usuario.Email) &&  sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		r = RespEntrada{Ok: true, Msg: "Devolviendo entradas.", Entradas: usuarios[usuario.Email].Entradas}
 		log.Println("Usuario "+ usuario.Email + " solicita sus entradas")
+		//llamada a la funcion para reiniciar la sesion
+    reiniciarSesion(usuario)
 	} else {
 		r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
 		log.Println("Usuario "+ usuario.Email + " solicita listar entradas, cuando ha perdido la sesion")
@@ -556,6 +547,8 @@ func modificarEntrada(w http.ResponseWriter, request *http.Request){
 		usuarios[usuario.Email].Entradas[i]= entrada
 		r = Resp{Ok: true, Msg: "Entrada Modificada con éxito."}
 		log.Println("Usuario "+ usuario.Email + " solicita modificar entrada con exito")
+		//llamada a la funcion para reiniciar la sesion
+    reiniciarSesion(usuario)
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 		log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesion")
@@ -587,6 +580,8 @@ func borrarEntrada(w http.ResponseWriter, request *http.Request){
 		delete(usuarios[usuario.Email].Entradas, i)
 		r = Resp{Ok: true, Msg: "Entrada Borrada con éxito."}
 		log.Println("Usuario "+ usuario.Email + " solicita borrar entrada")
+		//llamada a la funcion para reiniciar la sesion
+    reiniciarSesion(usuario)
 	} else {
 		r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 		log.Println("Usuario "+ usuario.Email + " solicita borrar entrada, cuando ha perdido la sesion")
@@ -612,6 +607,8 @@ func obtenerEntradasPorId(w http.ResponseWriter, request *http.Request){
 	if esEmailLogueado(usuario.Email) && sesiones[usuario.Email].Dato.Dato2==token.Dato2{
 		   r = RespEntrada{Ok: true, Msg: "Devolviendo entrada.",Entradas: usuarios[usuario.Email].Entradas}
 			 log.Println("Usuario "+ usuario.Email + " solicita entrada por identificador")
+			 //llamada a la funcion para reiniciar la sesion
+	     reiniciarSesion(usuario)
 	} else {
 		   r = RespEntrada{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión.", Entradas: make(map[int]Entrada)}
 			 log.Println("Usuario "+ usuario.Email + " solicita entrada por identificador, cuando ha perdido la sesion")
@@ -679,6 +676,8 @@ func modificarUsuario(w http.ResponseWriter, request *http.Request){
 		usuarios[usuario.Email] = usuario
 		r = Resp{Ok: true, Msg: "Contraseña modificada con exito."}    // formateamos respuesta
 		log.Println("Usuario "+ usuario.Email + "  modificar contraseña con exito")
+		//llamada a la funcion para reiniciar la sesion
+    reiniciarSesion(usuario)
   } else {
  			r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
 			log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesion")
@@ -722,7 +721,18 @@ func cargarDatos(){
 	checkError(error)
 	json.Unmarshal(datosBBDD, &usuarios)
 }
+/**
+* funcion para reiniciar sesion
+**/
+func reiniciarSesion(usuario Usuario){
 
+	//Cuando el usuario realiza una operacion, se reinicia la sesion, para mantener la sesion
+	sesion := sesiones[usuario.Email]
+	sesion.TiempoLimite = time.Now().Add(time.Hour * time.Duration(0) +
+								time.Minute * time.Duration(1) +
+								time.Second * time.Duration(30))
+							sesiones[usuario.Email] = sesion
+}
 /*
 *Funcion para mandar el email
 */
@@ -759,21 +769,19 @@ func senMail(email,pin string){
 	}
 	message += "\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
 
-	// Connect to the server, authenticate, set the sender and recipient,
-	// and send the email all in one step.
 	error := smtp.SendMail(
 		 "smtp.gmail.com:587",
 		auth,
 		from.Address,
 		[]string{to.Address},
 		[]byte(message),
-		//[]byte("This is the email body."),
+
 	)
 	checkError(error)
 	log.Println("Usuario "+ email + " se le ha enviado pin para login con exito")
 }
 func encodeRFC2047(String string) string{
-	// use mail's rfc2047 to encode any string
+
 	addr := mail.Address{String, ""}
 	return strings.Trim(addr.String(), " <>")
 }
