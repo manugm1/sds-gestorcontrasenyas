@@ -88,7 +88,7 @@ var entradas = make(map[int]Entrada)//entradas
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 var pinRecibido string
-var sesionPin Sesion
+//var sesionPin Sesion
 func randLetter(n int) string {
     b := make([]rune, n)
 		X.Seed(time.Now().UnixNano())
@@ -200,17 +200,12 @@ func comprobarPin(){
 		fmt.Println("Introduce pin enviado por correo: ")
 		pin := leerStringConsola()
 
-		//se comprueba si la sesion del pin, todavia esta activada
-		fechaHoraActual := time.Now()
-		if fechaHoraActual.Before(sesionPin.TiempoLimite) {
+
 		parametros := url.Values{}
 		parametros.Set("opcion", "12")
     parametros.Set("pin", pin)
 		//Pasamos el parámetro a la estructura Usuario
 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-
-		//pasar el token
-		//parametros.Set("token", codificarStructToJSONBase64(token))
 
 		//Pasar parámetros al servidor
 		cadenaJSON := comunicarServidor(parametros)
@@ -230,10 +225,8 @@ func comprobarPin(){
 
 		}else{
 			fmt.Println(respuesta.Msg)
-		 fmt.Println("Debes introducri pin correcto")
+		 //fmt.Println("Debes introducri pin correcto")
 		}
-	}
-//}
 }
 /**
 * [2] Operación de login sobre el servidor
@@ -251,7 +244,6 @@ func login(){
   err2 := checkmail.ValidateHost(email)
 	checkError(err2)
 
-//}
 	fmt.Println("Introduce contraseña: ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
   checkError(err)
@@ -281,9 +273,7 @@ func login(){
 	fmt.Println(respuesta.Ok)
 	if respuesta.Ok {
     usuarioActual = usuario
-		sesionPin = Sesion{TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
-									time.Minute * time.Duration(0) +
-									time.Second * time.Duration(30)) }
+		//llamar a la funcion comprobarPin para comprobar si el pin introducido por el usuario es correcto
 		comprobarPin()
 
 	}else{

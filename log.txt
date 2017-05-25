@@ -10,3 +10,24 @@
 2017/05/25 17:07:48 Volcando datos recopilados en la BBDD...
 2017/05/25 17:07:48 Apagando servidor ...
 2017/05/25 17:07:48 Servidor detenido correctamente
+2017/05/26 00:12:27 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/26 00:12:27 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/26 00:13:22 Usuario infoouadi@gmail.com ha tardado en poner el pin
+2017/05/26 00:13:43 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/26 00:13:43 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/26 00:13:59 Usuario infoouadi@gmail.com ha puesto pin correcto
+2017/05/26 00:21:26 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/26 00:21:26 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/26 00:21:38 Usuario infoouadi@gmail.com ha puesto pin incorrecto
+2017/05/26 00:21:44 Volcando datos recopilados en la BBDD...
+2017/05/26 00:21:44 Apagando servidor ...
+2017/05/26 00:21:44 Servidor detenido correctamente
+2017/05/26 00:21:44 listen: http: Server closed
+2017/05/26 00:22:22 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/26 00:22:22 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/26 00:22:54 Usuario infoouadi@gmail.com ha tardado en poner el pin
+2017/05/26 00:23:16 Usuario infoouadi@gmail.com se le ha enviado pin para login con exito
+2017/05/26 00:23:16 Usuario infoouadi@gmail.com se ha logeado correctamente
+2017/05/26 00:23:28 Usuario infoouadi@gmail.com ha puesto pin correcto
+2017/05/26 00:23:30 Usuario infoouadi@gmail.com solicita sus entradas
+2017/05/26 00:23:33 Usuario infoouadi@gmail.com ha cerrado sesion

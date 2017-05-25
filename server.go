@@ -68,6 +68,9 @@ type Sesion struct {
 		Dato Token
 
 }
+type SesionPin struct {
+		TiempoLimite time.Time
+}
 
 //Declaramos y/o inicializamos variables globales
 var rutaBBDD = "bbdd.json"
@@ -77,6 +80,7 @@ var entradas = make(map[int]Entrada)
 var sesiones = make(map[string]Sesion)
 var lettersNumbers = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 var pin string
+var sesionPin SesionPin
 
 // función para escribir una respuesta del servidor al cliente
 func comunicarCliente(w http.ResponseWriter, estructura interface{}) {
@@ -345,9 +349,13 @@ func login(w http.ResponseWriter, request *http.Request){
 			passIntroducidoCliente := base64.StdEncoding.EncodeToString(hash)
 
 			if usuarios[usuario.Email].Password == passIntroducidoCliente {
-
+        //generar el pin para mandarselo al usuario por correo
 				pin = randLettersNumbers(10)
 				senMail(usuario.Email,pin)
+				//crear una sesion del pin mandado al usuario por correo
+				sesionPin = SesionPin{TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
+											time.Minute * time.Duration(0) +
+											time.Second * time.Duration(30)) }
 
 				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir."  }    // formateamos respuesta
 				log.Println("Usuario "+ usuario.Email + " se ha logeado correctamente")
@@ -382,24 +390,36 @@ r := Resp{}
 if existeUsuario(usuario.Email){
 	//Ahora comprobamos si Email y Contraseña enviada
 	//desde cliente coincide con lo que tenemos de dicho usuario en la bbdd
-	if usuarios[usuario.Email].Email == usuario.Email &&  pin == string(cadenaPin){
-		//se genera el token
-		var token Token
-		token.Dato2 = crearToken(usuario.Email)
-		//fmt.Println(token.Dato2)
-		//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
-           sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
-												 time.Minute * time.Duration(1) +
-												 time.Second * time.Duration(30)), Dato : token }
-           sesiones[usuario.Email] = sesion
-		r = Resp{Ok: true, Msg: "El pin introducido es correcto.", Dato: token }    // formateamos respuesta
-		log.Println("Usuario "+ usuario.Email + " ha puesto pin correcto")
+	//se comprueba si la sesion del pin, todavia esta activada
+	fechaHoraActual := time.Now()
+	if fechaHoraActual.Before(sesionPin.TiempoLimite) {
+		if usuarios[usuario.Email].Email == usuario.Email &&  pin == string(cadenaPin) {
+			//se genera el token
+			var token Token
+			token.Dato2 = crearToken(usuario.Email)
+			//fmt.Println(token.Dato2)
+			//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
+	           sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
+													 time.Minute * time.Duration(1) +
+													 time.Second * time.Duration(30)), Dato : token }
+	           sesiones[usuario.Email] = sesion
+			r = Resp{Ok: true, Msg: "El pin introducido es correcto.", Dato: token }    // formateamos respuesta
+			log.Println("Usuario "+ usuario.Email + " ha puesto pin correcto")
+		}else{
+			r = Resp{Ok: false, Msg: "El pin no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
+			log.Println("Usuario "+ usuario.Email + " ha puesto pin incorrecto")
+		}
 	}else{
-		r = Resp{Ok: false, Msg: "El pin no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
-		log.Println("Usuario "+ usuario.Email + " ha puesto pin incorrecto")
+		r = Resp{Ok: false, Msg: "Se ha caducado el tiempo de sesion del pin.", Dato: Token{}}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " ha tardado en poner el pin")
+
 	}
-comunicarCliente(w, r)
+ }else{
+		r = Resp{Ok: false, Msg: "El usuario no existe, regístrate y vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + " no existe en la base de datos")
 }
+comunicarCliente(w, r)
+
 }
 /**
 *
