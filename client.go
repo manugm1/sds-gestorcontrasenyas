@@ -65,10 +65,6 @@ type UsuarioMod struct{
 	//Salt string
 	Entradas map[int] Entrada
 }
-type Sesion struct {
-		TiempoLimite time.Time
-}
-
 
 /**
 * Contraseña entrada: cifrado con AES/CTR desde el cliente.

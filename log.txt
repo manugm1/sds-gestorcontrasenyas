@@ -31,3 +31,6 @@
 2017/05/26 00:23:28 Usuario infoouadi@gmail.com ha puesto pin correcto
 2017/05/26 00:23:30 Usuario infoouadi@gmail.com solicita sus entradas
 2017/05/26 00:23:33 Usuario infoouadi@gmail.com ha cerrado sesion
+2017/05/26 00:26:27 Volcando datos recopilados en la BBDD...
+2017/05/26 00:26:27 Apagando servidor ...
+2017/05/26 00:26:27 Servidor detenido correctamente
