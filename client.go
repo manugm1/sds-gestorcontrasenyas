@@ -23,14 +23,17 @@ import (
 	"regexp"
 )
 
-// respuesta despues de comprobar si el usuario esta en la base de datos
+/**
+* Respuesta despues de comprobar si el usuario esta en la base de datos
+*/
 type RespLogin struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
-	//Pin string
 }
 
-// respuesta del servidor
+/**
+* Respuesta por defecto
+*/
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
@@ -38,7 +41,9 @@ type Resp struct {
 	//Pin string
 }
 
-// respuesta del servidor con peticiones sobre entradas
+/**
+* Respuesta del servidor con peticiones sobre entradas
+*/
 type RespEntrada struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
@@ -53,11 +58,17 @@ type Usuario struct{
 	Email string
 	Password string
 }
+
+/**
+* Token del usuario actual
+*/
 type Token struct{
   Dato2 string
 }
 
-
+/**
+* Estructura usuario cuando se modifica
+*/
 type UsuarioMod struct{
 	Email string
 	Password string
@@ -109,22 +120,24 @@ func validateEmail(email string) bool {
 	return Re.MatchString(email)
 }
 
- func generarContrasenyaAleatoria() string{
-	 var numeroCaracteres string
-	 var password string
-	 var respuestaNumeros string
-	//pREGUNTAS
+/**
+* Método que genera una contraseña aleatoria en base a formular a unas preguntas
+* al usuario.
+*/
+func generarContrasenyaAleatoria() string{
+	var numeroCaracteres string
+	var password string
+	var respuestaNumeros string
 	fmt.Println("¿Nº de caracteres?")
 	numeroCaracteres  = leerStringConsola()
 	for{
-	fmt.Println("¿Añadir números? S/N")
-	respuestaNumeros  = leerStringConsola()
-	 if strings.EqualFold(respuestaNumeros, "s") || strings.EqualFold(respuestaNumeros, "n"){
-		 break
-	 }else{
-
-		 fmt.Println("Hay que poner letra s/S o n/N")
-	 }
+		 fmt.Println("¿Añadir números? S/N")
+		 respuestaNumeros  = leerStringConsola()
+		 if strings.EqualFold(respuestaNumeros, "s") || strings.EqualFold(respuestaNumeros, "n"){
+			 break
+		 }else{
+			 fmt.Println("Hay que poner letra s/S o n/N")
+		 }
   }
 	if strings.EqualFold(respuestaNumeros, "n"){
 		i, error := strconv.Atoi(numeroCaracteres)
@@ -135,10 +148,8 @@ func validateEmail(email string) bool {
 		checkError(error)
 		password = randLettersNumbers(i)
 	}
-	///... LO QUE SE TE OCURRA
-	//GENERAR CONTRASEÑA ALEATORIA SEGÚN LO QUE HA ELEGIDO EL USUARIO
 	return password
-} //que devuelva la contraseña aleatoria
+}
 
 /**
 * [1] Operación de registro sobre el servidor
@@ -811,10 +822,16 @@ func decodificarJSONBase64ToJSON(cadenaCodificada string)([]byte){
 	return respuesta
 }
 
+/**
+* Cifra la contraseña de la entrada con AES-CTR (invocando al método encrypt)
+*/
 func cifrarContrasenyaEntrada(pass string)(string){
 	return base64.StdEncoding.EncodeToString(encrypt([]byte(pass), claveMaestra))
 }
 
+/**
+* Descifra la contraseña de la entrada cifrada en AES-CTR (invocando al método decrypt)
+*/
 func descifrarContrasenyaEntrada(pass string)(string){
 	decode, error := base64.StdEncoding.DecodeString(pass)
 	checkError(error)
@@ -822,7 +839,9 @@ func descifrarContrasenyaEntrada(pass string)(string){
 	return cadena
 }
 
-// función para cifrar (con AES en este caso), adjunta el IV al principio
+/**
+* Función para cifrar (con AES en este caso), pone el IV al principio
+*/
 func encrypt(data, key []byte) (out []byte) {
 	out = make([]byte, len(data)+16)    // reservamos espacio para el IV al principio
 	rand.Read(out[:16])                 // generamos el IV
@@ -833,7 +852,9 @@ func encrypt(data, key []byte) (out []byte) {
 	return
 }
 
-// función para descifrar (con AES en este caso)
+/**
+* Función para descifrar (con AES en este caso)
+*/
 func decrypt(data, key []byte) (out []byte) {
 	out = make([]byte, len(data)-16)     // la salida no va a tener el IV
 	blk, err := aes.NewCipher(key)       // cifrador en bloque (AES), usa key

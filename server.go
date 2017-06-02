@@ -23,14 +23,19 @@ import (
 	"strings"
 )
 
-// respuesta despues de comprobar si el usuario esta en la base de datos
+/**
+* respuesta despues de comprobar si el usuario esta en la base de datos
+*/
 type RespLogin struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	//Dato Token // el token
 	//Pin string
 }
-// respuesta por defecto del servidor
+
+/**
+* respuesta por defecto del servidor
+*/
 type Resp struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
@@ -38,13 +43,18 @@ type Resp struct {
 	//Pin string
 }
 
-// respuesta del servidor con peticiones sobre entradas
+/**
+* respuesta del servidor con peticiones sobre entradas
+*/
 type RespEntrada struct {
 	Ok  bool   // true -> correcto, false -> error
 	Msg string // mensaje adicional
 	Entradas map[int]Entrada
 }
 
+/**
+* Estructura usuario con todos sus componentes
+*/
 type Usuario struct{
 	Email string
 	Password string
@@ -53,21 +63,35 @@ type Usuario struct{
 	Entradas map[int] Entrada
 }
 
+/**
+* Estructura entrada con todos sus componentes
+*/
 type Entrada struct {
     Login string
     Password string
     Web string
     Descripcion string
 }
+
+/**
+* Estructura entrada con todos sus componentes
+*/
 type Token struct{
   Dato2 string
 }
+
+/**
+* Estructura sesion con el tiempo límite a comparar
+*/
 type Sesion struct {
 		Email string
 		TiempoLimite time.Time
 		Dato Token
-
 }
+
+/**
+* Estructura Sesión Pin con el tiempo límite
+*/
 type SesionPin struct {
 		TiempoLimite time.Time
 }
@@ -679,7 +703,7 @@ func modificarUsuario(w http.ResponseWriter, request *http.Request){
   error2 := json.Unmarshal(cadenaJSONtoken, &token)
   checkError(error2)
   r:= Resp{}
-  if esEmailLogueado(usuario.Email){ //&& sesiones[usuario.Email].Dato.Dato2==token.Dato2{
+  if esEmailLogueado(usuario.Email){
 		salt := make([]byte, 32)
 		_, error2 := io.ReadFull(rand.Reader, salt)
 		checkError(error2)
@@ -699,7 +723,7 @@ func modificarUsuario(w http.ResponseWriter, request *http.Request){
     reiniciarSesion(usuario)
   } else {
  			r = Resp{Ok: false, Msg: "Operación no puede completarse, el usuario ha perdido la sesión."}
-			log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesion")
+			log.Println("Usuario "+ usuario.Email + " solicita modificar entrada, cuando ha perdido la sesión")
   }
   comunicarCliente(w, r)
 }
