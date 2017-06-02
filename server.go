@@ -354,10 +354,10 @@ func login(w http.ResponseWriter, request *http.Request){
 				senMail(usuario.Email,pin)
 				//crear una sesion del pin mandado al usuario por correo
 				sesionPin = SesionPin{TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
-											time.Minute * time.Duration(0) +
-											time.Second * time.Duration(30)) }
+											time.Minute * time.Duration(5) +
+											time.Second * time.Duration(00)) }
 
-				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve reciberas un pin para introducir."  }    // formateamos respuesta
+				r = RespLogin{Ok: true, Msg: "El login y la contraseña son correctos, en breve recibirás un pin para introducir."  }    // formateamos respuesta
 				log.Println("Usuario "+ usuario.Email + " se ha logeado correctamente")
 			}else{
 				r = RespLogin{Ok: false, Msg: "La contraseña no es correcta. Vuelva a intentarlo."}    // formateamos respuesta
@@ -397,7 +397,6 @@ if existeUsuario(usuario.Email){
 			//se genera el token
 			var token Token
 			token.Dato2 = crearToken(usuario.Email)
-			//fmt.Println(token.Dato2)
 			//Se crea la sesión con tiempo actual + 90 segundos de tiempo límite
 	           sesion := Sesion{Email: usuario.Email, TiempoLimite: time.Now().Add(time.Hour * time.Duration(0) +
 													 time.Minute * time.Duration(1) +
@@ -406,7 +405,7 @@ if existeUsuario(usuario.Email){
 			r = Resp{Ok: true, Msg: "El pin introducido es correcto.", Dato: token }    // formateamos respuesta
 			log.Println("Usuario "+ usuario.Email + " ha puesto pin correcto")
 		}else{
-			r = Resp{Ok: false, Msg: "El pin no es correcta. Vuelva a intentarlo.", Dato: Token{}}    // formateamos respuesta
+			r = Resp{Ok: false, Msg: "El pin no es correcto. Vuelve a intentarlo.", Dato: Token{}}    // formateamos respuesta
 			log.Println("Usuario "+ usuario.Email + " ha puesto pin incorrecto")
 		}
 	}else{
@@ -759,21 +758,22 @@ func reiniciarSesion(usuario Usuario){
 
 func senMail(email,pin string){
 
-	// Set up authentication information.
+	//Cuenta de GMAIL creada para enviar emails con los pins a los
+	//usuarios
 	auth := smtp.PlainAuth(
 		"",
-		"infochamit@gmail.com",
-		"Ouadi1981.",
+		"sdsua2017@gmail.com",
+		"sds2017ua",
 		"smtp.gmail.com",
 	)
-	from := mail.Address{"Chamit Ouadi", "infochamit@gmail.com"}
+	from := mail.Address{"Gestor de contraseñas - SDS UA", "sdsua2017@gmail.com"}
 	to := mail.Address{email, email}
 	title := "Nuevo pin - Gestor de contraseñas"
 
-	body := "Hola \nBienvenido a Gestor de contraseñas.\n" +
-	"Te has registrado correctamente pero para poder acceder al sistema necesitarás un pin generado automáticamente y de forma segura." +
-	"Es el siguiente:\n" +  pin + "\nEsperemos que disfrutes de nuestro servicio." +
-	"\nMuchas gracias.";
+	body := "Hola, \n\nBienvenido a Gestor de contraseñas.\n" +
+	"Te has registrado correctamente pero para poder acceder al sistema necesitarás un pin generado automáticamente y de forma segura. \n" +
+	"Es el siguiente:\n\n" +  pin + "\nEsperemos que disfrutes de nuestro servicio." +
+	"\n\nMuchas gracias.";
 
 	header := make(map[string]string)
 	header["From"] = from.String()

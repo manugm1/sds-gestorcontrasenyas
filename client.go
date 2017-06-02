@@ -20,8 +20,7 @@ import (
 	"time"
 	"golang.org/x/crypto/ssh/terminal"
 	"syscall"
-  "github.com/badoux/checkmail"
-
+	"regexp"
 )
 
 // respuesta despues de comprobar si el usuario esta en la base de datos
@@ -101,6 +100,15 @@ func randLettersNumbers(n int) string {
     }
     return string(b)
 }
+
+/**
+* Función para validar un email, que obligue a que sea de GMAIL
+*/
+func validateEmail(email string) bool {
+	Re := regexp.MustCompile(`^[a-z0-9](\.?[a-z0-9]){5,}@g(oogle)?mail\.com$`)
+	return Re.MatchString(email)
+}
+
  func generarContrasenyaAleatoria() string{
 	 var numeroCaracteres string
 	 var password string
@@ -137,23 +145,25 @@ func randLettersNumbers(n int) string {
  */
 func registro() {
 	var password string
+
 	//Introducir usuario y contraseña
 	fmt.Println("Introduce email: ")
 	email := leerStringConsola()
-	err := checkmail.ValidateFormat(email)
-  checkError(err)
-  err2 := checkmail.ValidateHost(email)
-  checkError(err2)
 
-	/*fmt.Println("Introduce contraseña: ")
-	password := leerStringConsola()*/
+	for !validateEmail(email) {
+		fmt.Println("El email debe ser de tipo GMAIL con 5 o más caracteres su usuario (12345@gmail.com)")
+		//Introducir usuario y contraseña
+		fmt.Println("Introduce email: ")
+		email = leerStringConsola()
+	}
+
 	//NUEVO: Antes de introducir la contraseña, el sistema preguntará
 	fmt.Println("¿Generar contraseña aleatoria? S/N")
 	respuestaPassword  := leerStringConsola()
 
 	if strings.EqualFold(respuestaPassword, "s"){
 		password = generarContrasenyaAleatoria()
-		fmt.Println("El password generado aleatoriamente es ",password)
+		fmt.Println("El password generado aleatoriamente es (sin corchetes): [",password,"]")
 	}else {
 		fmt.Println("Introduce contraseña: ")
 		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
@@ -190,7 +200,6 @@ func registro() {
 func comprobarPin(){
 
 	//Si no hay usuario actual, no se hace nada
-	//if usuarioActual != (Usuario{}) {
 
 		//introducir el pin enviado por correo
 		fmt.Println("Introduce pin enviado por correo: ")
@@ -216,12 +225,7 @@ func comprobarPin(){
 		fmt.Println(respuesta.Msg)
 
 		if(respuesta.Ok){
-			//fmt.Println(respuesta.Msg)
 			token.Dato2=respuesta.Dato.Dato2
-
-		}else{
-			fmt.Println(respuesta.Msg)
-		 //fmt.Println("Debes introducri pin correcto")
 		}
 }
 /**
@@ -230,15 +234,16 @@ func comprobarPin(){
  */
 func login(){
 
-	//for{
 	//Introducir usuario y contraseña
 	fmt.Println("Introduce email: ")
 	email := leerStringConsola()
-	//aqui se valida el email, para comprobar si cumple con las restricciones y existe
-	err := checkmail.ValidateFormat(email)
-  checkError(err)
-  err2 := checkmail.ValidateHost(email)
-	checkError(err2)
+
+	for !validateEmail(email) {
+		fmt.Println("El email debe ser de tipo GMAIL con 5 o más caracteres su usuario (12345@gmail.com)")
+		//Introducir usuario y contraseña
+		fmt.Println("Introduce email: ")
+		email = leerStringConsola()
+	}
 
 	fmt.Println("Introduce contraseña: ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
@@ -568,10 +573,12 @@ func modificarContraseña(){
 
 		if strings.EqualFold(respuestaPassword, "s"){
 			password = generarContrasenyaAleatoria()
-			fmt.Println("El password generado aleatoriamente es ",password)
+			fmt.Println("El password generado aleatoriamente es (sin corchetes): [",password,"]")
 		}else {
 			fmt.Println("Introduce contraseña: ")
-			password = leerStringConsola()
+			bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+			checkError(err)
+			password = string(bytePassword)
 		}
 
 			parametros := url.Values{}
