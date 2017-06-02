@@ -717,8 +717,8 @@ func modificarUsuario(w http.ResponseWriter, request *http.Request){
 		usuario.Salt = base64.StdEncoding.EncodeToString(salt)
 		//Lo agregamos al mapa global de usuarios
 		usuarios[usuario.Email] = usuario
-		r = Resp{Ok: true, Msg: "Contraseña modificada con exito."}    // formateamos respuesta
-		log.Println("Usuario "+ usuario.Email + "  modificar contraseña con exito")
+		r = Resp{Ok: true, Msg: "Contraseña modificada con éxito."}    // formateamos respuesta
+		log.Println("Usuario "+ usuario.Email + "  modificar contraseña con éxito")
 		//llamada a la funcion para reiniciar la sesion
     reiniciarSesion(usuario)
   } else {
