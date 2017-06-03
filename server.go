@@ -795,7 +795,7 @@ func senMail(email,pin string){
 	title := "Nuevo pin - Gestor de contraseñas"
 
 	body := "Hola, \n\nBienvenido a Gestor de contraseñas.\n" +
-	"Te has registrado correctamente pero para poder acceder al sistema necesitarás un pin generado automáticamente y de forma segura. \n" +
+	"Para poder acceder al sistema necesitarás un pin generado automáticamente y de forma segura. \n" +
 	"Es el siguiente:\n\n" +  pin + "\nEsperemos que disfrutes de nuestro servicio." +
 	"\n\nMuchas gracias.";
 
