@@ -421,24 +421,29 @@ func editarEntrada(){
 		fmt.Println("Introduce id de la entrada: ")
 		id := leerStringConsola()
 		i, error := strconv.Atoi(id)
-    checkError(error)
-		//var respuesta Entrada
+		for error != nil {
+			fmt.Println("Debe ser un número")
+			fmt.Println("Introduce id de la entrada: ")
+			id = leerStringConsola()
+			i, error = strconv.Atoi(id)
+		}
+    //checkError(error)
 
 		aux  := obtenerEntradasPorId(i)
 			if aux!=(Entrada{}) {
 				fmt.Println("Login: ",aux.Login)
 				fmt.Println("Password: ",descifrarContrasenyaEntrada(aux.Password))
 				fmt.Println("Web: ",aux.Web)
-				fmt.Println("Descripcion: ",aux.Descripcion)
+				fmt.Println("Descripción: ",aux.Descripcion)
 for{
-				fmt.Println("Elige opcion que quieres modificar: ")
+				fmt.Println("Elige campo a modificar: ")
 				fmt.Println("[1] Login")
 				fmt.Println("[2] Password")
 				fmt.Println("[3] Web")
-				fmt.Println("[4] Descripcion")
-				fmt.Println("[q] Para salir")
+				fmt.Println("[4] Descripción")
+				fmt.Println("[q] Atrás")
 				op = leerStringConsola()
-				println("opcion elegida ",op)
+				println("Opción elegida: ",op)
 
 				if op == "1" || op == "2" || op == "3" || op == "4" {
 
@@ -491,8 +496,7 @@ for{
 		}
 
 			}else{
-        fmt.Println("No existe Entrada con id ",i)
-
+        fmt.Println("No existe entrada con id: ",i)
 			}
 	}
 
@@ -647,23 +651,34 @@ func darBajaUsuario(){
 
 	//Si no hay usuario actual, no se hace nada
 	if usuarioActual != (Usuario{}) {
-		parametros := url.Values{}
-		parametros.Set("opcion", "11")
 
-		//Pasamos el parámetro a la estructura Usuario
-		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
-		//pasar el token
-		parametros.Set("token", codificarStructToJSONBase64(token))
+		for{
+			 fmt.Println("¿Estás seguro que quieres darte de baja? Borraremos todos tus datos y no podrás recuperarlos. (S/N)")
+			 respuestaNumeros := leerStringConsola()
+			 if strings.EqualFold(respuestaNumeros, "s"){
+				 	parametros := url.Values{}
+		 		 	parametros.Set("opcion", "11")
 
-		//Pasar parámetros al servidor
-		cadenaJSON := comunicarServidor(parametros)
-		var respuesta Resp
-		//Des-serializamos el json a la estructura creada
-		error := json.Unmarshal(cadenaJSON, &respuesta)
-		checkError(error)
-		fmt.Println(respuesta.Msg)
-		//os.Exit(1) //finalizamos el programa
+			 		//Pasamos el parámetro a la estructura Usuario
+			 		parametros.Set("usuario", codificarStructToJSONBase64(usuarioActual))
+			 		//pasar el token
+			 		parametros.Set("token", codificarStructToJSONBase64(token))
 
+			 		//Pasar parámetros al servidor
+			 		cadenaJSON := comunicarServidor(parametros)
+			 		var respuesta Resp
+			 		//Des-serializamos el json a la estructura creada
+			 		error := json.Unmarshal(cadenaJSON, &respuesta)
+			 		checkError(error)
+			 		fmt.Println(respuesta.Msg)
+					break
+			 }else if strings.EqualFold(respuestaNumeros, "n"){
+				 fmt.Println("Has elegido seguir con tu cuenta. Bien hecho.")
+				 break
+			 }else{
+				 fmt.Println("Hay que poner letra s/S o n/N")
+			 }
+	  }
 	}
 }
 
